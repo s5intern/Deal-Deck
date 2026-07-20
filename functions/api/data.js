@@ -9,8 +9,8 @@
 //
 // Every value is namespaced by the caller's Google user id, and a caller can
 // only read/write keys that begin with their own "dd:<sub>:" prefix.
-
-import { verifyGoogle } from "./chat.js";
+// NOTE: self-contained on purpose (no cross-file imports) so the Pages
+// Functions bundle always compiles.
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -46,6 +46,34 @@ export async function onRequest(context) {
     return json({ ok: true });
   }
   return json({ error: "Method not allowed" }, 405);
+}
+
+async function verifyGoogle(request, env) {
+  const auth = request.headers.get("Authorization") || "";
+  const token = auth.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return { error: "Missing sign-in token", status: 401 };
+
+  const info = await fetch(
+    "https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(token)
+  ).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+
+  if (!info || !info.sub) return { error: "Invalid sign-in token", status: 401 };
+  if (env.GOOGLE_CLIENT_ID && info.aud !== env.GOOGLE_CLIENT_ID)
+    return { error: "Token audience mismatch", status: 401 };
+  if (info.exp && Date.now() / 1000 > Number(info.exp))
+    return { error: "Sign-in expired", status: 401 };
+
+  const email = (info.email || "").toLowerCase();
+  if (env.ALLOWED_EMAILS) {
+    const allow = env.ALLOWED_EMAILS.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+    if (allow.length && !allow.includes(email))
+      return { error: "This account is not on the allowlist", status: 403 };
+  }
+  if (env.ALLOWED_DOMAIN) {
+    const dom = env.ALLOWED_DOMAIN.toLowerCase();
+    if (!email.endsWith("@" + dom)) return { error: "Domain not allowed", status: 403 };
+  }
+  return { sub: info.sub, email };
 }
 
 function json(obj, status = 200) {

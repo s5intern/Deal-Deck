@@ -41,7 +41,7 @@ export async function onRequestPost(context) {
   }
 }
 
-export async function verifyGoogle(request, env) {
+async function verifyGoogle(request, env) {
   const auth = request.headers.get("Authorization") || "";
   const token = auth.replace(/^Bearer\s+/i, "").trim();
   if (!token) return { error: "Missing sign-in token", status: 401 };

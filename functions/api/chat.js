@@ -52,7 +52,7 @@ export async function onRequestPost(context) {
   }
 }
 
-// Anthropic content (string | block[]) -> plain text 
+// Anthropic content (string | block[]) -> plain text
 function flatten(content) {
   if (typeof content === "string") return content;
   if (Array.isArray(content))

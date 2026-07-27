@@ -306,7 +306,7 @@ const RATING_KEYS = [
   ["fit","S5 thesis fit"],
 ];
 
-/* ---------- storage helpers ---------- */
+/* ---------- storage helpers ----------- */
 /* ---------- auth helpers ---------- */
 function authHeaders(extra){ return Object.assign({Authorization:"Bearer "+(store.idToken||"")}, extra||{}); }
 function decodeJwt(t){

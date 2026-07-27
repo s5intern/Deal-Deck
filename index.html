@@ -301,6 +301,26 @@
   .abk .amt{font-family:"JetBrains Mono";font-size:12px;color:var(--muted);text-align:right}
   .abk .keep{font-family:"JetBrains Mono";font-size:9.5px;color:var(--muted-2);text-align:right;margin-top:4px}
   @media (max-width:860px){ .kpis{grid-template-columns:1fr 1fr} .mgrid{grid-template-columns:1fr} }
+
+  /* model: S5 read banner + price solver */
+  .s5read{display:flex;align-items:center;justify-content:space-between;gap:16px;
+    background:linear-gradient(180deg,var(--panel),rgba(19,30,48,.4));border:1px solid var(--line-soft);
+    border-left-width:3px;border-radius:12px;padding:14px 18px;margin-bottom:16px}
+  .s5read-l{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .s5read-tag{font-family:"JetBrains Mono";font-size:10px;font-weight:700;letter-spacing:.12em;
+    border:1px solid;border-radius:6px;padding:4px 9px;white-space:nowrap}
+  .s5read-txt{font-size:13.5px;line-height:1.55;color:#d6deec}
+  .solver{display:flex;align-items:center;gap:16px;justify-content:space-between;flex-wrap:wrap;
+    background:radial-gradient(600px 200px at 100% 0,rgba(255,176,46,.09),transparent 70%),var(--panel);
+    border:1px solid var(--signal-dim);border-radius:12px;padding:16px 20px;margin-bottom:16px}
+  .solver .k{font-family:"JetBrains Mono";font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted-2)}
+  .solver .q{cursor:help;color:var(--muted-2)}
+  .solver-val{font-family:"JetBrains Mono";font-size:26px;font-weight:700;color:var(--signal);margin-top:4px;line-height:1.1}
+  .solver-x{font-size:13px;color:var(--muted);font-weight:500}
+  .solver-sub{font-size:12px;color:var(--muted);margin-top:5px}
+  .solver-btn{background:linear-gradient(180deg,rgba(255,176,46,.16),rgba(255,176,46,.06));border:1px solid var(--signal-dim);
+    color:var(--signal);border-radius:9px;padding:11px 16px;font-weight:600;font-size:13px;white-space:nowrap;flex:0 0 auto}
+  .solver-btn:hover{background:rgba(255,176,46,.24)}
 </style>
 
 </head>
@@ -523,6 +543,16 @@ function computeModel(E, a){
   };
 }
 const DEFAULT_ASSUMP={mult:5, lev:0.5, rate:0.10, amort:10, growth:0.05, capex:0.05, tax:0, hold:5, exit:5};
+
+// Highest entry multiple that still clears the cash-on-cash target AND the DSCR floor,
+// holding all other assumptions fixed. Returns a multiple, or null if even 2.0x fails.
+function maxEntryMultiple(E, a, cocTarget, dscrFloor){
+  for(let mm=8; mm>=2; mm-=0.05){
+    const r=computeModel(E,{...a,mult:mm});
+    if(r.coc1>=cocTarget && (!isFinite(r.dscr) || r.dscr>=dscrFloor)) return Math.round(mm*20)/20;
+  }
+  return null;
+}
 
 /* ================= AUTH GATE ================= */
 function Root(){
@@ -1017,6 +1047,14 @@ function Model({deal,saveDeal}){
   const adjE=Math.max(ebitda-haircut,0);
   const m=computeModel(adjE,a);
 
+  const COC_TARGET=0.25, DSCR_FLOOR=1.5;
+  const passCoC=m.coc1>=COC_TARGET, passDSCR=(!isFinite(m.dscr)||m.dscr>=DSCR_FLOOR), inBand=a.mult>=4&&a.mult<=6;
+  const clears=passCoC&&passDSCR;
+  const readState = adjE<=0 ? "ENTER EBITDA TO MODEL" : clears ? (inBand?"CLEARS S5 HURDLES":"WORKS — PRICED ABOVE 4–6× BAND") : "BELOW S5 HURDLES";
+  const readColor = adjE<=0 ? "var(--muted)" : clears ? (inBand?"var(--go)":"var(--watch)") : "var(--pass)";
+  const maxMult = adjE>0 ? maxEntryMultiple(adjE,a,COC_TARGET,DSCR_FLOOR) : null;
+  const maxPriceUSD = maxMult!=null ? adjE*maxMult : null;
+
   const mults=[3.5,4,4.5,5,5.5,6,6.5];
   const levs=[0,0.3,0.5,0.6,0.7];
   const nearest=(arr,v)=>arr.reduce((p,c)=>Math.abs(c-v)<Math.abs(p-v)?c:p,arr[0]);
@@ -1036,6 +1074,32 @@ function Model({deal,saveDeal}){
 
   return (
     <div>
+      <div className="s5read" style={{borderColor:readColor}}>
+        <div className="s5read-l">
+          <span className="s5read-tag" style={{color:readColor,borderColor:readColor}}>{readState}</span>
+          <span className="s5read-txt">
+            {adjE<=0
+              ? "Add the CIM's adjusted EBITDA below and the whole model comes alive."
+              : <>At <b>{a.mult.toFixed(2)}×</b> with <b>{(a.lev*100).toFixed(0)}%</b> debt, this returns <b style={{color:cocText(m.coc1)}}>{fmtPct(m.coc1)}</b> Yr-1 cash-on-cash{isFinite(m.dscr)?<> at <b style={{color:dscrColor(m.dscr)}}>{m.dscr.toFixed(2)}×</b> coverage</>:" (all-equity, no debt)"}. S5 wants ≥25% and ≥1.5×.</>}
+          </span>
+        </div>
+      </div>
+
+      {adjE>0 && <div className="solver">
+        <div className="solver-main">
+          <div className="k">Most S5 should pay <span className="q" title="Highest entry price that still clears ≥25% cash-on-cash and ≥1.5× DSCR at your current leverage and operating assumptions.">ⓘ</span></div>
+          {maxMult!=null
+            ? <div className="solver-val">{fmtUSD(maxPriceUSD)} <span className="solver-x">{maxMult.toFixed(2)}× adj. EBITDA</span></div>
+            : <div className="solver-val" style={{color:"var(--pass)"}}>No price clears both hurdles <span className="solver-x">at these assumptions</span></div>}
+          <div className="solver-sub">
+            {maxMult!=null
+              ? (a.mult<=maxMult+1e-9 ? "Your current price is within the disciplined range." : "Your current price is above this — you'd break a hurdle.")
+              : "Lower leverage or rate, or require faster growth, to open room."}
+          </div>
+        </div>
+        {maxMult!=null && <button className="solver-btn" onClick={()=>setAsm("mult",maxMult)}>Set entry to {maxMult.toFixed(2)}×</button>}
+      </div>}
+
       <div className="kpis">
         <div className="kpi"><div className="k">Purchase price</div>
           <div className="big">{fmtUSD(m.price)}</div><div className="sub">{a.mult.toFixed(2)}× adj. EBITDA</div></div>

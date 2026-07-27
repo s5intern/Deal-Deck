@@ -12,6 +12,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
 <style>
   :root{
@@ -291,7 +292,7 @@ const {useState,useEffect,useRef,useCallback} = React;
    CONFIG  — edit these three, then deploy.
    ============================================================ */
 // 1) Paste your Google OAuth Client ID (ends in .apps.googleusercontent.com)
-const GOOGLE_CLIENT_ID = "164987131312-adksaras673lf5q3m7l1emtmq1q1snsa.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
 // 2) A model available on YOUR Anthropic account (see docs.claude.com models page)
 const MODEL = "claude-sonnet-4-5";
 // 3) false = this browser only (works instantly). true = Cloudflare KV cross-device (needs setup — see README).
@@ -306,7 +307,7 @@ const RATING_KEYS = [
   ["fit","S5 thesis fit"],
 ];
 
-/* ---------- storage helpers ----------- */
+/* ---------- storage helpers ---------- */
 /* ---------- auth helpers ---------- */
 function authHeaders(extra){ return Object.assign({Authorization:"Bearer "+(store.idToken||"")}, extra||{}); }
 function decodeJwt(t){
@@ -341,7 +342,7 @@ const store = {
 const uid = () => "d"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 
 /* ---------- Anthropic API ---------- */
-async function callClaude(messages, {system, pdf, max_tokens=1500}={}){
+async function callClaude(messages, {system, pdf, max_tokens=1500, retries=3}={}){
   const userContent = pdf
     ? [ {type:"document",source:{type:"base64",media_type:"application/pdf",data:pdf}}, {type:"text",text:messages} ]
     : messages;
@@ -351,21 +352,28 @@ async function callClaude(messages, {system, pdf, max_tokens=1500}={}){
   const body = { model: MODEL, max_tokens, messages: msgs };
   if(system) body.system = system;
 
-  let res;
-  try{
-    res = await fetch("/api/chat",{
-      method:"POST",
-      headers: authHeaders({"Content-Type":"application/json"}),
-      body: JSON.stringify(body),
-    });
-  }catch(e){ throw new Error("NETWORK"); }
+  for(let attempt=0; ; attempt++){
+    let res;
+    try{
+      res = await fetch("/api/chat",{
+        method:"POST",
+        headers: authHeaders({"Content-Type":"application/json"}),
+        body: JSON.stringify(body),
+      });
+    }catch(e){ throw new Error("NETWORK"); }
 
-  if(res.status===401 || res.status===403) throw new Error("AUTH");
-  if(res.status===404) throw new Error("NO_FUNCTION");
-  if(res.status===429) throw new Error("RATE_LIMIT");
-  if(!res.ok){ const t=await res.text().catch(()=>""); throw new Error("API "+res.status+" "+t.slice(0,160)); }
-  const data = await res.json();
-  return (data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n").trim();
+    // Free-tier rate limit: wait and retry a few times before giving up
+    if(res.status===429 && attempt < retries){
+      await new Promise(r=>setTimeout(r, 2500*(attempt+1)));
+      continue;
+    }
+    if(res.status===401 || res.status===403) throw new Error("AUTH");
+    if(res.status===404) throw new Error("NO_FUNCTION");
+    if(res.status===429) throw new Error("RATE_LIMIT");
+    if(!res.ok){ const t=await res.text().catch(()=>""); throw new Error("API "+res.status+" "+t.slice(0,160)); }
+    const data = await res.json();
+    return (data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n").trim();
+  }
 }
 function friendlyError(e){
   const m=(e&&e.message)||"";
@@ -380,6 +388,25 @@ function parseJSON(text){
   const a=t.indexOf("{"), b=t.lastIndexOf("}");
   if(a>=0 && b>a) t=t.slice(a,b+1);
   return JSON.parse(t);
+}
+
+// Extract text from a PDF in the browser (the binary never leaves this device)
+async function extractPdfText(file, onProgress){
+  const lib = window.pdfjsLib;
+  if(!lib) throw new Error("PDF reader didn't load — check your connection and reload.");
+  lib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  const buf = await file.arrayBuffer();
+  const pdf = await lib.getDocument({data: buf}).promise;
+  const pages = Math.min(pdf.numPages, 80);
+  let out = "";
+  for(let i=1;i<=pages;i++){
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    out += content.items.map(it=>it.str).join(" ") + "\n\n";
+    if(onProgress) onProgress(i/pages);
+    if(out.length > 45000){ out += "\n[...document truncated for length...]"; break; }
+  }
+  return out.trim();
 }
 
 const ANALYSIS_PROMPT = `You are the lead analyst on Saturn Five's Deals Team. Saturn Five is a permanent-hold investment firm that buys controlling interests in durable, cash-flow-generating small businesses — typically $2–10M EBITDA, bought at 4–6x, blue-collar / "moves atoms" (trades, manufacturing, service). No fund clock: returns come from ongoing distributions (~25% cash-on-cash target), not exits. Judge this deal against THAT thesis.
@@ -951,25 +978,26 @@ function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,pdfCache}){
   const inputRef=useRef(null);
 
   const pickFile=(f)=>{ if(!f) return; if(f.type!=="application/pdf"){ setErr("That's not a PDF. Upload the CIM as a PDF, or paste its text below."); return;} setErr(""); setFile(f); };
-  const toB64=(f)=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result.split(",")[1]); r.onerror=()=>rej(new Error("read")); r.readAsDataURL(f); });
 
   const run=async()=>{
     if(!file && pasted.trim().length<40){ setErr("Add a PDF or paste at least a few paragraphs of the CIM."); return; }
     setPhase("run"); setErr(""); setProg(8);
-    const id=uid(); let pdf=null;
+    const id=uid();
     try{
-      setScan("Reading document…");
-      if(file){ pdf=await toB64(file); }
-      setProg(22);
-      setScan("Extracting facts & briefing digest…");
-      const opts = pdf ? {pdf} : {};
-      const analysisInput = pdf ? ANALYSIS_PROMPT : (ANALYSIS_PROMPT+"\n\nCIM TEXT:\n"+pasted);
-      const digestInput   = pdf ? DIGEST_PROMPT   : (DIGEST_PROMPT+"\n\nCIM TEXT:\n"+pasted);
-      const [aRaw,digest]=await Promise.all([
-        callClaude(analysisInput, opts),
-        callClaude(digestInput, opts),
-      ]);
-      setProg(72); setScan("Scoring against the S5 thesis…");
+      let text = pasted;
+      if(file){
+        setScan("Reading the PDF on this device…");
+        text = await extractPdfText(file, (p)=>setProg(8+Math.round(p*16)));
+        if(!text || text.trim().length<200) throw new Error("PDF_EMPTY");
+      }
+      setProg(26);
+      setScan("Extracting facts against the S5 thesis…");
+      const analysisInput = ANALYSIS_PROMPT+"\n\nCIM TEXT:\n"+text;
+      const digestInput   = DIGEST_PROMPT+"\n\nCIM TEXT:\n"+text;
+      const aRaw = await callClaude(analysisInput, {});
+      setProg(58); setScan("Writing the briefing digest…");
+      const digest = await callClaude(digestInput, {});
+      setProg(80); setScan("Scoring…");
       const a=parseJSON(aRaw);
       const deal={
         id, createdAt:Date.now(), status:"ready", chat:[], analystNotes:"", digest,
@@ -982,15 +1010,15 @@ function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,pdfCache}){
         verdictReason:a.verdictReason||"", nextSteps:a.nextSteps||[],
       };
       setProg(100); setScan("Done.");
-      if(pdf) pdfCache.current[id]=pdf;
       await addDeal(deal);
       setTimeout(()=>{ setActive(id); setTab("analysis"); onClose(); },350);
     }catch(e){
       console.error(e);
-      const base=friendlyError(e);
-      setErr(base.startsWith("Something went wrong")
-        ? "The analysis didn't come back cleanly. Very large or image-only PDFs can cause this — try again, or paste the key text instead."
-        : base);
+      let base;
+      if(e.message==="PDF_EMPTY")
+        base="Couldn't pull text from that PDF — it's likely scanned or image-only. Open it, copy the text, and paste it in the box below instead.";
+      else{ base=friendlyError(e); if(base.startsWith("Something went wrong")) base="The analysis didn't come back cleanly. Try again, or paste the key text below."; }
+      setErr(base);
       setPhase("error");
     }
   };

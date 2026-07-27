@@ -279,6 +279,28 @@
   .userbar .u-mail{font-family:"JetBrains Mono";font-size:9.5px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .signout{background:transparent;border:1px solid var(--line-soft);border-radius:8px;color:var(--muted);padding:6px 9px;font-size:11px;flex:0 0 auto}
   .signout:hover{color:var(--pass);border-color:var(--pass)}
+  /* model tab */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+  .kpi{background:linear-gradient(180deg,var(--panel),rgba(19,30,48,.5));border:1px solid var(--line-soft);border-radius:12px;padding:14px 16px}
+  .kpi .k{font-family:"JetBrains Mono";font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2)}
+  .kpi .big{font-family:"JetBrains Mono";font-size:24px;font-weight:700;margin-top:7px;line-height:1}
+  .kpi .sub{font-size:10.5px;color:var(--muted);margin-top:6px;font-family:"JetBrains Mono"}
+  .mgrid{display:grid;grid-template-columns:322px 1fr;gap:16px;align-items:start}
+  .asm .row{margin-bottom:14px}
+  .asm .lab{display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px}
+  .asm .lab .v{font-family:"JetBrains Mono";font-weight:700;color:var(--signal)}
+  .asm input[type=number]{width:100%;background:var(--deck);border:1px solid var(--line-soft);border-radius:8px;color:var(--ink);padding:9px 11px;font-family:"JetBrains Mono";font-size:15px}
+  .asm input[type=number]:focus{border-color:var(--cyan);outline:none}
+  .sens{width:100%;border-collapse:collapse;font-family:"JetBrains Mono";font-size:11.5px}
+  .sens th,.sens td{border:1px solid var(--line-soft);padding:8px 6px;text-align:center}
+  .sens th{color:var(--muted-2);font-weight:600;font-size:10px;letter-spacing:.05em}
+  .sens td{font-weight:700}
+  .sens td.cur{outline:2px solid var(--ink);outline-offset:-2px}
+  .abk .row{display:grid;grid-template-columns:1fr 84px 118px;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line-soft)}
+  .abk .row:last-child{border-bottom:none}
+  .abk .amt{font-family:"JetBrains Mono";font-size:12px;color:var(--muted);text-align:right}
+  .abk .keep{font-family:"JetBrains Mono";font-size:9.5px;color:var(--muted-2);text-align:right;margin-top:4px}
+  @media (max-width:860px){ .kpis{grid-template-columns:1fr 1fr} .mgrid{grid-template-columns:1fr} }
 </style>
 
 </head>
@@ -430,10 +452,77 @@ Read the attached Confidential Information Memorandum and return ONLY a JSON obj
  "verdict": "PURSUE"|"WATCH"|"PASS",
  "verdictReason": string,              // <=32 words, why this verdict for S5 specifically
  "nextSteps": [string]                 // 4 concrete diligence / process steps, each <=18 words
+ ,"fin": {                             // best-effort numbers in USD (plain integers, no $/commas); use 0 if unknown
+   "ebitda": number,                   // most recent ADJUSTED EBITDA
+   "revenue": number,                  // most recent revenue
+   "ebitdaPrior": number,              // prior-year adjusted EBITDA
+   "revPrior": number,                 // prior-year revenue
+   "netDebt": number,                  // interest-bearing / long-term debt if shown, else 0
+   "currentAssets": number,
+   "currentLiab": number,
+   "addbacks": [ {"label": string, "amount": number} ]  // EBITDA normalization add-backs, up to 5
+ }
 }
 Be specific and honest — name the tradeoff. Do not inflate scores.`;
 
 const DIGEST_PROMPT = `You are briefing Saturn Five's Deals Team. Read the attached CIM and write a dense ~230-word factual digest capturing: what the company does, financials (revenue, EBITDA, margins, growth), customers & concentration, operations/assets, management & transition, deal structure, and notable risks. Plain text, no headers, no preamble. This will ground later Q&A, so pack in the concrete facts and numbers.`;
+
+/* ---------- finance helpers ---------- */
+function amortPayment(rate, nper, pv){ // annual payment on amortizing loan
+  if(pv<=0) return 0; if(rate===0) return pv/nper;
+  return pv*rate/(1-Math.pow(1+rate,-nper));
+}
+function irr(cfs){
+  let r=0.15;
+  for(let i=0;i<80;i++){
+    let npv=0,d=0;
+    for(let t=0;t<cfs.length;t++){ const f=Math.pow(1+r,t); npv+=cfs[t]/f; d+=-t*cfs[t]/(f*(1+r)); }
+    if(!isFinite(d)||d===0) break;
+    const nr=r-npv/d;
+    if(!isFinite(nr)) break;
+    if(Math.abs(nr-r)<1e-7){ r=nr; break; }
+    r=Math.max(-0.99,nr);
+  }
+  return r;
+}
+function fmtUSD(n){ if(n==null||isNaN(n)) return "—"; const a=Math.abs(n);
+  if(a>=1e6) return "$"+(n/1e6).toFixed(2)+"M";
+  if(a>=1e3) return "$"+Math.round(n/1e3)+"K";
+  return "$"+Math.round(n); }
+function fmtPct(n){ return (n==null||isNaN(n)||!isFinite(n))?"—":(n*100).toFixed(1)+"%"; }
+function cagr(a,b,yrs){ if(!a||!b||a<=0||b<=0) return null; return Math.pow(b/a,1/yrs)-1; }
+
+// Full deal model given base EBITDA + assumptions
+function computeModel(E, a){
+  const price=E*a.mult;
+  const debt=price*a.lev;
+  const equity=Math.max(price-debt,0);
+  const ds=amortPayment(a.rate, a.amort, debt);
+  const rows=[]; let bal=debt, cumDist=0;
+  for(let t=1;t<=a.hold;t++){
+    const Et=E*Math.pow(1+a.growth,t);
+    const interest=bal*a.rate;
+    const principal=Math.min(Math.max(ds-interest,0),bal);
+    bal=Math.max(bal-principal,0);
+    const capex=Et*a.capex;
+    const preTax=Et-ds-capex;
+    const tax=Math.max(preTax,0)*a.tax;
+    const dist=preTax-tax;
+    cumDist+=dist;
+    rows.push({t,Et,interest,principal,capex,tax,dist,coc:equity>0?dist/equity:0});
+  }
+  const Elast=E*Math.pow(1+a.growth,a.hold);
+  const terminalEquity=Math.max(Elast*a.exit-bal,0);
+  const cfs=[-equity, ...rows.map((r,i)=> r.dist + (i===rows.length-1?terminalEquity:0))];
+  const moic=equity>0?(cumDist+terminalEquity)/equity:0;
+  return {
+    price,debt,equity,ds,rows,
+    coc1: rows.length?rows[0].coc:0,
+    dscr: ds>0?(E*(1+a.growth))/ds:Infinity,
+    cumDist, terminalEquity, moic, irr:irr(cfs),
+  };
+}
+const DEFAULT_ASSUMP={mult:5, lev:0.5, rate:0.10, amort:10, growth:0.05, capex:0.05, tax:0, hold:5, exit:5};
 
 /* ================= AUTH GATE ================= */
 function Root(){
@@ -678,12 +767,14 @@ function DealView({deal,tab,setTab,saveDeal,removeDeal,pdfCache}){
         <div className="tabs">
           <button className={"tab"+(tab==="analysis"?" active":"")} onClick={()=>setTab("analysis")}>Analysis</button>
           <button className={"tab"+(tab==="review"?" active":"")} onClick={()=>setTab("review")}>Review</button>
+          <button className={"tab"+(tab==="model"?" active":"")} onClick={()=>setTab("model")}>Model</button>
           <button className={"tab"+(tab==="chat"?" active":"")} onClick={()=>setTab("chat")}>
             Ask the CIM <span className="cnt">{(deal.chat||[]).length||""}</span>
           </button>
         </div>
         {tab==="analysis" && <Analysis deal={deal}/>}
         {tab==="review" && <Review deal={deal} saveDeal={saveDeal}/>}
+        {tab==="model" && <Model deal={deal} saveDeal={saveDeal}/>}
         {tab==="chat" && <Chat deal={deal} saveDeal={saveDeal} pdfCache={pdfCache}/>}
       </div>
     </div>
@@ -899,6 +990,155 @@ function ListEdit({items,onChange,onAdd,onDel,ph}){
 }
 
 /* ---------- Chat ---------- */
+function cocCellBg(v){ if(v>=0.25) return "rgba(55,217,160,.22)"; if(v>=0.15) return "rgba(255,176,46,.16)"; if(v>=0) return "rgba(255,93,108,.14)"; return "rgba(255,93,108,.3)"; }
+function cocText(v){ if(v>=0.25) return "var(--go)"; if(v>=0.15) return "var(--watch)"; return "var(--pass)"; }
+function dscrColor(v){ if(v>=1.5) return "var(--go)"; if(v>=1.25) return "var(--watch)"; return "var(--pass)"; }
+
+function Model({deal,saveDeal}){
+  const fin=deal.fin||{};
+  const build=()=> deal.model || {
+    ebitda:Number(fin.ebitda)||0,
+    addbacks:(fin.addbacks||[]).map(x=>({label:x.label||"Add-back",amount:Number(x.amount)||0,keep:1})),
+    a:{...DEFAULT_ASSUMP},
+  };
+  const [ebitda,setEbitda]=useState(build().ebitda);
+  const [addbacks,setAddbacks]=useState(build().addbacks);
+  const [a,setA]=useState(build().a);
+  useEffect(()=>{ const i=build(); setEbitda(i.ebitda); setAddbacks(i.addbacks); setA(i.a); },[deal.id]);
+
+  const timer=useRef();
+  useEffect(()=>{ clearTimeout(timer.current);
+    timer.current=setTimeout(()=>saveDeal({...deal,model:{ebitda,addbacks,a}}),700);
+    return ()=>clearTimeout(timer.current);
+  },[ebitda,addbacks,a]);
+
+  const setAsm=(k,v)=>setA(p=>({...p,[k]:v}));
+  const haircut=addbacks.reduce((s,x)=>s+(x.amount||0)*(1-x.keep),0);
+  const adjE=Math.max(ebitda-haircut,0);
+  const m=computeModel(adjE,a);
+
+  const mults=[3.5,4,4.5,5,5.5,6,6.5];
+  const levs=[0,0.3,0.5,0.6,0.7];
+  const nearest=(arr,v)=>arr.reduce((p,c)=>Math.abs(c-v)<Math.abs(p-v)?c:p,arr[0]);
+  const curM=nearest(mults,a.mult), curL=nearest(levs,a.lev);
+
+  const revYoY=cagr(fin.revPrior,fin.revenue,1);
+  const ebYoY=cagr(fin.ebitdaPrior,fin.ebitda,1);
+  const margin=fin.revenue?fin.ebitda/fin.revenue:null;
+  const curRatio=fin.currentLiab?fin.currentAssets/fin.currentLiab:null;
+
+  const Sl=({label,val,disp,min,max,step,onCh})=>(
+    <div className="row">
+      <div className="lab"><span>{label}</span><span className="v">{disp}</span></div>
+      <input type="range" min={min} max={max} step={step} value={val} onChange={e=>onCh(+e.target.value)}/>
+    </div>
+  );
+
+  return (
+    <div>
+      <div className="kpis">
+        <div className="kpi"><div className="k">Purchase price</div>
+          <div className="big">{fmtUSD(m.price)}</div><div className="sub">{a.mult.toFixed(2)}× adj. EBITDA</div></div>
+        <div className="kpi"><div className="k">Equity check</div>
+          <div className="big">{fmtUSD(m.equity)}</div><div className="sub">{fmtUSD(m.debt)} debt @ {(a.rate*100).toFixed(1)}%</div></div>
+        <div className="kpi"><div className="k">Yr-1 cash-on-cash</div>
+          <div className="big" style={{color:cocText(m.coc1)}}>{fmtPct(m.coc1)}</div>
+          <div className="sub">S5 target ≥ 25%</div></div>
+        <div className="kpi"><div className="k">DSCR (Yr 1)</div>
+          <div className="big" style={{color:dscrColor(m.dscr)}}>{isFinite(m.dscr)?m.dscr.toFixed(2)+"×":"n/a"}</div>
+          <div className="sub">covenant floor ~1.25×</div></div>
+      </div>
+
+      <div className="mgrid">
+        <div className="card asm">
+          <h3>Assumptions</h3>
+          <div className="field" style={{marginBottom:16}}>
+            <label>Adjusted EBITDA (base)</label>
+            <input type="number" value={ebitda} onChange={e=>setEbitda(+e.target.value||0)}/>
+          </div>
+          <Sl label="Entry multiple" val={a.mult} disp={a.mult.toFixed(2)+"×"} min={2} max={8} step={0.25} onCh={v=>setAsm("mult",v)}/>
+          <Sl label="Leverage (debt %)" val={a.lev} disp={(a.lev*100).toFixed(0)+"%"} min={0} max={0.8} step={0.05} onCh={v=>setAsm("lev",v)}/>
+          <Sl label="Interest rate" val={a.rate} disp={(a.rate*100).toFixed(1)+"%"} min={0.05} max={0.15} step={0.005} onCh={v=>setAsm("rate",v)}/>
+          <Sl label="Amortization (yrs)" val={a.amort} disp={a.amort+" yr"} min={5} max={25} step={1} onCh={v=>setAsm("amort",v)}/>
+          <Sl label="EBITDA growth / yr" val={a.growth} disp={(a.growth*100).toFixed(0)+"%"} min={-0.05} max={0.20} step={0.01} onCh={v=>setAsm("growth",v)}/>
+          <Sl label="Maint. capex (% EBITDA)" val={a.capex} disp={(a.capex*100).toFixed(0)+"%"} min={0} max={0.20} step={0.01} onCh={v=>setAsm("capex",v)}/>
+          <Sl label="Cash tax rate" val={a.tax} disp={(a.tax*100).toFixed(0)+"%"} min={0} max={0.4} step={0.01} onCh={v=>setAsm("tax",v)}/>
+          <Sl label="Illustrative hold" val={a.hold} disp={a.hold+" yr"} min={3} max={10} step={1} onCh={v=>setAsm("hold",v)}/>
+          <Sl label="Exit multiple" val={a.exit} disp={a.exit.toFixed(2)+"×"} min={2} max={8} step={0.25} onCh={v=>setAsm("exit",v)}/>
+          <p className="lead" style={{margin:"6px 0 0"}}>Autosaves. S5 holds permanently — MOIC/IRR use the exit multiple only to sketch value, they aren't a sale plan.</p>
+        </div>
+
+        <div>
+          <div className="card" style={{marginBottom:16}}>
+            <h3>Cash-on-cash sensitivity <span className="tag ai">YR 1</span></h3>
+            <p className="lead" style={{marginTop:-6}}>Year-1 cash yield on equity across entry price and leverage. Green clears the 25% bar.</p>
+            <div style={{overflowX:"auto"}}>
+            <table className="sens">
+              <thead><tr><th>mult ＼ debt%</th>{levs.map(l=><th key={l}>{(l*100).toFixed(0)}%</th>)}</tr></thead>
+              <tbody>
+                {mults.map(mm=>(
+                  <tr key={mm}>
+                    <th>{mm.toFixed(2)}×</th>
+                    {levs.map(l=>{ const v=computeModel(adjE,{...a,mult:mm,lev:l}).coc1;
+                      const cur=(mm===curM&&l===curL);
+                      return <td key={l} className={cur?"cur":""} style={{background:cocCellBg(v),color:cocText(v)}}>{fmtPct(v)}</td>; })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            </div>
+          </div>
+
+          <div className="grid2">
+            <div className="card">
+              <h3>Return sketch</h3>
+              <div className="ratings">
+                <div className="rrow"><div className="rl"><span className="name">Cumulative distributions ({a.hold}y)</span><span className="num">{fmtUSD(m.cumDist)}</span></div></div>
+                <div className="rrow"><div className="rl"><span className="name">Terminal equity @ {a.exit.toFixed(2)}×</span><span className="num">{fmtUSD(m.terminalEquity)}</span></div></div>
+                <div className="rrow"><div className="rl"><span className="name">MOIC</span><span className="num">{m.moic?m.moic.toFixed(2)+"×":"—"}</span></div></div>
+                <div className="rrow"><div className="rl"><span className="name">IRR</span><span className="num" style={{color:cocText(m.irr)}}>{fmtPct(m.irr)}</span></div></div>
+              </div>
+            </div>
+            <div className="card">
+              <h3>Trend &amp; quality</h3>
+              <div className="ratings">
+                <div className="rrow"><div className="rl"><span className="name">Revenue (latest)</span><span className="num">{fin.revenue?fmtUSD(fin.revenue):"—"}</span></div></div>
+                <div className="rrow"><div className="rl"><span className="name">Revenue YoY</span><span className="num" style={{color:revYoY!=null?cocText(revYoY+0.15):"inherit"}}>{revYoY!=null?fmtPct(revYoY):"—"}</span></div></div>
+                <div className="rrow"><div className="rl"><span className="name">EBITDA margin</span><span className="num">{margin!=null?fmtPct(margin):"—"}</span></div></div>
+                <div className="rrow"><div className="rl"><span className="name">EBITDA YoY</span><span className="num">{ebYoY!=null?fmtPct(ebYoY):"—"}</span></div></div>
+                <div className="rrow"><div className="rl"><span className="name">Current ratio</span><span className="num">{curRatio!=null?curRatio.toFixed(1)+"×":"—"}</span></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card" style={{marginTop:16}}>
+            <h3>Add-back scrutiny <span className="tag risk">HAIRCUT</span></h3>
+            <p className="lead" style={{marginTop:-6}}>Discount add-backs you don't fully believe. Base EBITDA drops accordingly and the whole model reprices.</p>
+            {addbacks.length===0 && <p className="lead">No add-backs were extracted. Add them in the Review tab or trust the base EBITDA above.</p>}
+            <div className="abk">
+              {addbacks.map((x,i)=>(
+                <div className="row" key={i}>
+                  <span style={{fontSize:12.5}}>{x.label}</span>
+                  <span className="amt">{fmtUSD(x.amount)}</span>
+                  <span>
+                    <input type="range" min={0} max={1} step={0.1} value={x.keep}
+                      onChange={e=>{ const v=+e.target.value; setAddbacks(p=>p.map((y,j)=>j===i?{...y,keep:v}:y)); }}/>
+                    <div className="keep">keep {(x.keep*100).toFixed(0)}%</div>
+                  </span>
+                </div>
+              ))}
+            </div>
+            {(haircut>0||adjE!==ebitda) && <div style={{marginTop:12,padding:"10px 13px",borderRadius:9,background:"var(--deck)",display:"flex",justifyContent:"space-between",fontFamily:"JetBrains Mono",fontSize:12.5}}>
+              <span style={{color:"var(--muted)"}}>Conservative EBITDA after haircut</span>
+              <strong style={{color:"var(--signal)"}}>{fmtUSD(adjE)}</strong>
+            </div>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Chat({deal,saveDeal,pdfCache}){
   const [messages,setMessages]=useState(deal.chat||[]);
   const [input,setInput]=useState("");
@@ -1008,6 +1248,7 @@ function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,pdfCache}){
         ratings:a.ratings||{financials:0,market:0,moat:0,management:0,fit:0},
         overall:clamp(a.overall), verdict:VERDICTS.includes(a.verdict)?a.verdict:"WATCH",
         verdictReason:a.verdictReason||"", nextSteps:a.nextSteps||[],
+        fin:a.fin||{}, model:null,
       };
       setProg(100); setScan("Done.");
       await addDeal(deal);

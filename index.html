@@ -467,8 +467,8 @@ Read the attached Confidential Information Memorandum and return ONLY a JSON obj
  "pros": [string],                     // 5 items, each <=18 words
  "cons": [string],                     // 5 items, each <=18 words
  "risks": [string],                    // 3 diligence risk flags, each <=16 words
- "ratings": {"financials":int,"market":int,"moat":int,"management":int,"fit":int}, // each 0-100
- "overall": int,                       // 0-100 overall score
+ "ratings": {"financials":int,"market":int,"moat":int,"management":int,"fit":int}, // each 0-100, see SCORING below
+ "overall": int,                       // 0-100 (will be recomputed; still give your best estimate)
  "verdict": "PURSUE"|"WATCH"|"PASS",
  "verdictReason": string,              // <=32 words, why this verdict for S5 specifically
  "nextSteps": [string]                 // 4 concrete diligence / process steps, each <=18 words
@@ -483,7 +483,23 @@ Read the attached Confidential Information Memorandum and return ONLY a JSON obj
    "addbacks": [ {"label": string, "amount": number} ]  // EBITDA normalization add-backs, up to 5
  }
 }
-Be specific and honest — name the tradeoff. Do not inflate scores.`;
+Be specific and honest — name the tradeoff. Do not inflate scores.
+
+SCORING (critical — do this carefully):
+Rate each of the five dimensions on this anchored scale, and USE THE FULL RANGE:
+  90-100 = exceptional / rare — a genuine standout on this dimension
+  75-89  = strong — clearly above average
+  60-74  = solid / typical for a healthy small business
+  45-59  = mixed — real concerns balancing the positives
+  30-44  = weak — a material problem
+  0-29   = disqualifying on this dimension
+The five dimensions measure DIFFERENT things, so their scores should differ from each other — do NOT give the same number across dimensions.
+  - financials: margin, growth, earnings quality, add-back risk, leverage
+  - market: industry durability, demand, cyclicality, fragmentation
+  - moat: switching costs, licensing, capability barriers, customer stickiness
+  - management: depth below the owner, transition/key-person risk
+  - fit: match to S5 (permanent hold, $2-10M EBITDA, 4-6x, blue-collar, cash generative)
+Most real deals land in the 50-70 range. Reserve 80+ for genuinely excellent attributes and use sub-45 when warranted. DO NOT default every score to ~75 — a flat, uniform score set is a failure.`;
 
 const DIGEST_PROMPT = `You are briefing Saturn Five's Deals Team. Read the attached CIM and write a dense ~230-word factual digest capturing: what the company does, financials (revenue, EBITDA, margins, growth), customers & concentration, operations/assets, management & transition, deal structure, and notable risks. Plain text, no headers, no preamble. This will ground later Q&A, so pack in the concrete facts and numbers.`;
 
@@ -1310,7 +1326,7 @@ function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,pdfCache}){
         revenue:a.revenue||"", ebitda:a.ebitda||"", years:a.years||"", askNote:a.askNote||"Not disclosed",
         summary:a.summary||"", pros:a.pros||[], cons:a.cons||[], risks:a.risks||[],
         ratings:a.ratings||{financials:0,market:0,moat:0,management:0,fit:0},
-        overall:clamp(a.overall), verdict:VERDICTS.includes(a.verdict)?a.verdict:"WATCH",
+        overall:overallFromRatings(a.ratings) ?? clamp(a.overall), verdict:VERDICTS.includes(a.verdict)?a.verdict:"WATCH",
         verdictReason:a.verdictReason||"", nextSteps:a.nextSteps||[],
         fin:a.fin||{}, model:null,
       };
@@ -1383,6 +1399,15 @@ function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,pdfCache}){
   );
 }
 function clamp(n){ n=+n; if(isNaN(n)) return 0; return Math.max(0,Math.min(100,Math.round(n))); }
+// Headline score, computed from the sub-ratings (weighted to S5 priorities) rather
+// than trusted from the model — which otherwise flattens everything to ~75.
+function overallFromRatings(r){
+  if(!r || typeof r!=="object") return null;
+  const w={financials:0.30, fit:0.25, moat:0.20, market:0.15, management:0.10};
+  let sum=0, wsum=0;
+  for(const k in w){ const v=Number(r[k]); if(!isNaN(v)){ sum+=v*w[k]; wsum+=w[k]; } }
+  return wsum>0 ? clamp(sum/wsum) : null;
+}
 
 ReactDOM.createRoot(document.getElementById("root")).render(<Root/>);
 </script>

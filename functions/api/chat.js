@@ -1,13 +1,16 @@
 // POST /api/chat
-// Verifies the caller's Google sign-in, then forwards the request to Anthropic
-// using the server-side API key. The key never reaches the browser.
+// Verifies the caller's Google sign-in, then forwards the request to Google's
+// Gemini API (free tier). Translates the Anthropic-style request the client
+// sends into Gemini's format, and translates Gemini's reply back into
+// Anthropic shape { content:[{type:"text",text}] } so the client needs no changes.
 //
-// Required Cloudflare env vars (Settings -> Environment variables, mark as Secret):
-//   ANTHROPIC_API_KEY   your Anthropic key (sk-ant-...)
-//   GOOGLE_CLIENT_ID    same client ID used in index.html
+// Required Cloudflare env vars (Settings -> Environment variables):
+//   GEMINI_API_KEY    free key from aistudio.google.com/apikey   (secret)
+//   GOOGLE_CLIENT_ID  same client ID used in index.html (for sign-in check)
 // Optional:
-//   ALLOWED_EMAILS      comma-separated allowlist, e.g. "a@x.com,b@x.com"
-//   ALLOWED_DOMAIN      restrict to one workspace domain, e.g. "saturnfive.com"
+//   GEMINI_MODEL      default "gemini-2.0-flash" (must support PDFs/vision)
+//   ALLOWED_EMAILS    comma-separated allowlist, e.g. "a@x.com,b@x.com"
+//   ALLOWED_DOMAIN    restrict to one workspace domain, e.g. "saturnfive.com"
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -15,30 +18,80 @@ export async function onRequestPost(context) {
     const gate = await verifyGoogle(request, env);
     if (gate.error) return json({ error: gate.error }, gate.status);
 
-    if (!env.ANTHROPIC_API_KEY)
-      return json({ error: "Server is missing ANTHROPIC_API_KEY" }, 500);
+    if (!env.GEMINI_API_KEY)
+      return json({ error: "Server is missing GEMINI_API_KEY" }, 500);
 
     const payload = await request.json();
-    payload.max_tokens = Math.min(Number(payload.max_tokens) || 1500, 4096);
+    const model = env.GEMINI_MODEL || "gemini-2.0-flash";
 
-    const upstream = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
+    // ----- translate Anthropic-style body -> Gemini body -----
+    const contents = (payload.messages || []).map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: toParts(m.content),
+    }));
+
+    const gemBody = {
+      contents,
+      generationConfig: {
+        maxOutputTokens: Math.min(Number(payload.max_tokens) || 1500, 8192),
       },
-      body: JSON.stringify(payload),
+    };
+    if (payload.system) {
+      gemBody.system_instruction = { parts: [{ text: String(payload.system) }] };
+    }
+
+    const url =
+      "https://generativelanguage.googleapis.com/v1beta/models/" +
+      encodeURIComponent(model) +
+      ":generateContent?key=" +
+      encodeURIComponent(env.GEMINI_API_KEY);
+
+    const upstream = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(gemBody),
     });
 
-    const text = await upstream.text();
-    return new Response(text, {
-      status: upstream.status,
-      headers: { "Content-Type": "application/json" },
-    });
+    const data = await upstream.json().catch(() => null);
+
+    if (!upstream.ok || !data) {
+      const msg = (data && data.error && data.error.message) || "Gemini request failed";
+      return json({ error: msg }, upstream.status || 502);
+    }
+
+    // ----- translate Gemini reply -> Anthropic shape -----
+    const cand = (data.candidates && data.candidates[0]) || null;
+    const text = cand && cand.content && cand.content.parts
+      ? cand.content.parts.map((p) => p.text || "").join("")
+      : "";
+
+    if (!text) {
+      const reason = cand ? (cand.finishReason || "no text returned") : "no candidates";
+      return json({ error: "Gemini returned no text (" + reason + ")" }, 502);
+    }
+
+    return json({ content: [{ type: "text", text }] });
   } catch (e) {
     return json({ error: String(e) }, 500);
   }
+}
+
+// Anthropic content (string | block[]) -> Gemini parts[]
+function toParts(content) {
+  if (typeof content === "string") return [{ text: content }];
+  if (Array.isArray(content)) {
+    return content.map((b) => {
+      if (b.type === "text") return { text: b.text || "" };
+      if (b.type === "document" && b.source && b.source.type === "base64") {
+        return { inline_data: { mime_type: b.source.media_type || "application/pdf", data: b.source.data } };
+      }
+      if (b.type === "image" && b.source && b.source.type === "base64") {
+        return { inline_data: { mime_type: b.source.media_type || "image/png", data: b.source.data } };
+      }
+      return { text: "" };
+    });
+  }
+  return [{ text: "" }];
 }
 
 async function verifyGoogle(request, env) {

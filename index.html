@@ -371,6 +371,26 @@
   .fingrid input[type=number]{width:100%;background:var(--deck);border:1px solid var(--line-soft);border-radius:9px;color:var(--ink);padding:9px 11px;font-family:"JetBrains Mono";font-size:12.5px}
   .fingrid input[type=number]:focus{border-color:var(--cyan);outline:none}
   @media (max-width:760px){ .fingrid{grid-template-columns:1fr 1fr} }
+
+  /* compare (side by side) */
+  .cmp-pick{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+  .cmp-chip{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line-soft);border-radius:999px;padding:8px 14px;color:var(--muted);font-size:12.5px;font-weight:600}
+  .cmp-chip:hover{color:var(--ink);border-color:var(--line)}
+  .cmp-chip.on{color:var(--ink);border-color:var(--signal-dim);background:rgba(255,176,46,.06)}
+  .cmp-chip .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .cmp-wrap{border:1px solid var(--line-soft);border-radius:12px;overflow-x:auto;background:var(--panel)}
+  .cmp{width:100%;border-collapse:collapse;font-size:13px}
+  .cmp th{padding:14px;border-bottom:1px solid var(--line-soft);text-align:right;vertical-align:bottom;cursor:pointer;min-width:130px}
+  .cmp th.rowlab{text-align:left;min-width:120px}
+  .cmp-name{font-family:"Space Grotesk";font-weight:600;font-size:15px}
+  .cmp-sub{font-size:11px;color:var(--muted-2);margin-top:2px;font-weight:400}
+  .cmp td{padding:10px 14px;border-bottom:1px solid var(--line-soft);text-align:right}
+  .cmp td.rowlab{text-align:left;color:var(--muted);font-size:12.5px}
+  .cmp tbody tr:last-child td{border-bottom:none}
+  .cmp .mono{font-family:"JetBrains Mono";font-weight:600}
+  .cmp td.best{background:rgba(55,217,160,.08)}
+  .cmp .star{color:var(--go);font-size:10px;margin-left:5px;vertical-align:top}
+  .cmp-sec td{background:var(--deck);font-family:"JetBrains Mono";font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);text-align:left;padding:8px 14px}
 </style>
 
 </head>
@@ -769,7 +789,7 @@ function App({user,onSignOut}){
   const [tab,setTab]=useState("analysis");
   const [showModal,setShowModal]=useState(false);
   const [showSettings,setShowSettings]=useState(false);
-  const [route,setRoute]=useState("pipeline");
+  const [route,setRoute]=useState("deal");
   const [settings,setSettings]=useState(CFG);
   const [railOpen,setRailOpen]=useState(false);
   const [loaded,setLoaded]=useState(false);
@@ -817,17 +837,17 @@ function App({user,onSignOut}){
       <button className="menutoggle" onClick={()=>setRailOpen(o=>!o)}>☰</button>
       <Rail deals={deals} activeId={route==="deal"?activeId:null} loaded={loaded} user={user} onSignOut={onSignOut}
         onPick={(id)=>{setActiveId(id);setTab("analysis");setRoute("deal");setRailOpen(false);}}
-        onPipeline={()=>{setRoute("pipeline");setRailOpen(false);}}
+        onCompare={()=>{setRoute("compare");setRailOpen(false);}} compareActive={route==="compare"}
         onNew={()=>setShowModal(true)} onSettings={()=>setShowSettings(true)} open={railOpen}/>
       <div className="main">
-        {route==="pipeline"
-          ? <Pipeline deals={deals} saveDeal={saveDeal} onNew={()=>setShowModal(true)}
+        {route==="compare"
+          ? <Compare deals={deals} onNew={()=>setShowModal(true)}
               onPick={(id)=>{setActiveId(id);setTab("analysis");setRoute("deal");}}/>
           : (!active
               ? <Empty onNew={()=>setShowModal(true)} loaded={loaded}/>
               : <DealView key={active.id} deal={active} deals={deals} tab={tab} setTab={setTab}
                   saveDeal={saveDeal} removeDeal={removeDeal} pdfCache={pdfCache} settings={settings}
-                  onBack={()=>setRoute("pipeline")}/>)}
+                  onBack={()=>setRoute("compare")}/>)}
       </div>
       {showModal && <UploadModal onClose={()=>setShowModal(false)} addDeal={addDeal}
           saveDeal={saveDeal} setActive={setActiveId} setTab={setTab} setRoute={setRoute} pdfCache={pdfCache} settings={settings}/>}
@@ -837,7 +857,7 @@ function App({user,onSignOut}){
 }
 
 /* ---------- Rail ---------- */
-function Rail({deals,activeId,onPick,onNew,open,loaded,user,onSignOut,onSettings,onPipeline}){
+function Rail({deals,activeId,onPick,onNew,open,loaded,user,onSignOut,onSettings,onCompare,compareActive}){
   return (
     <div className={"rail"+(open?" open":"")}>
       <div className="brand">
@@ -864,8 +884,8 @@ function Rail({deals,activeId,onPick,onNew,open,loaded,user,onSignOut,onSettings
         <span style={{fontSize:16,lineHeight:1}}>＋</span> Upload CIM
       </button>
 
-      <button className={"pipebtn"+(activeId==null?" active":"")} onClick={onPipeline}>
-        <span style={{fontSize:14}}>▦</span> Pipeline
+      <button className={"pipebtn"+(compareActive?" active":"")} onClick={onCompare}>
+        <span style={{fontSize:14}}>⇄</span> Compare
       </button>
 
       <div className="rosterhead">
@@ -937,7 +957,7 @@ function DealView({deal,deals,tab,setTab,saveDeal,removeDeal,pdfCache,settings,o
     <div className="stage" ref={stageRef}>
       <div className="wrap">
         <div className="dealbar">
-          <button className="ghost sm" onClick={onBack}>← Pipeline</button>
+          <button className="ghost sm" onClick={onBack}>← Compare</button>
           <select className="stagesel" value={deal.stage||"New"} style={{color:stageColor(deal.stage||"New"),borderColor:stageColor(deal.stage||"New")}}
             onChange={e=>saveDeal({...deal,stage:e.target.value})}>{STAGES.map(x=><option key={x} value={x}>{x}</option>)}</select>
           <div style={{flex:1}}></div>
@@ -1683,50 +1703,72 @@ function pipeStats(deals){
   return {n:deals.length, avgScore:avg(scores), avgMult:avg(mults), avgMargin:avg(margins), totalE};
 }
 
-function Pipeline({deals,onPick,saveDeal,onNew}){
-  const [sort,setSort]=useState({k:"overall",dir:-1});
-  const st=pipeStats(deals);
-  const rows=deals.map(d=>{ const q=dealQuick(d); return {d,coc:q.coc1,mult:q.mult,
-    ebitda:dealEbitda(d), score:Number(d.overall)||0 }; });
-  const val=(r,k)=>({name:(r.d.name||"").toLowerCase(),stage:STAGES.indexOf(r.d.stage||"New"),overall:r.score,
-    verdict:r.d.verdict||"",ebitda:r.ebitda,mult:r.mult||0,coc:r.coc==null?-1:r.coc}[k]);
-  rows.sort((a,b)=>{ const A=val(a,sort.k),B=val(b,sort.k); if(A<B)return -sort.dir; if(A>B)return sort.dir; return 0; });
-  const hd=(k,label,r)=>(<th className={r?"r":""} onClick={()=>setSort(s=>({k,dir:s.k===k?-s.dir:(k==="name"?1:-1)}))}>
-      {label}{sort.k===k?(sort.dir<0?" ↓":" ↑"):""}</th>);
+function Compare({deals,onPick,onNew}){
+  const [sel,setSel]=useState(deals.slice(0,3).map(d=>d.id));
+  useEffect(()=>{ setSel(s=>{ const v=s.filter(id=>deals.some(d=>d.id===id)); return v.length?v:deals.slice(0,3).map(d=>d.id); }); },[deals.length]);
+  const toggle=(id)=>setSel(s=> s.includes(id) ? s.filter(x=>x!==id) : (s.length>=4? s : [...s,id]) );
+  const picked=sel.map(id=>deals.find(d=>d.id===id)).filter(Boolean);
+
   if(deals.length===0) return (
     <div className="stage"><div className="wrap"><div className="empty" style={{height:"60vh"}}><div>
-      <h2>Your pipeline is empty.</h2><p>Upload a CIM to start building it.</p>
+      <h2>Nothing to compare yet.</h2><p>Upload a couple of CIMs, then line them up side by side.</p>
       <button className="newbtn" style={{display:"inline-flex",width:"auto",margin:0,padding:"12px 22px"}} onClick={onNew}><span style={{fontSize:16}}>＋</span> Upload a CIM</button>
     </div></div></div></div>);
+
+  const q=(d)=>dealQuick(d);
+  const rows=[
+    {label:"Overall score", get:d=>Number(d.overall)||null, fmt:v=>Math.round(v), better:"hi", color:v=>scoreColor(v)},
+    {label:"Verdict", get:d=>d.verdict||null, fmt:v=>v, color:v=>verdictColor(v)},
+    {label:"Stage", get:d=>d.stage||"New", fmt:v=>v, color:v=>stageColor(v)},
+    {label:"Revenue", get:d=>(d.fin&&d.fin.revenue)?d.fin.revenue:parseMoney(d.revenue)||null, fmt:v=>fmtUSD(v), better:"hi"},
+    {label:"Adj. EBITDA", get:d=>dealEbitda(d)||null, fmt:v=>fmtUSD(v), better:"hi"},
+    {label:"EBITDA margin", get:d=>(d.fin&&d.fin.revenue)?d.fin.ebitda/d.fin.revenue:null, fmt:v=>Math.round(v*100)+"%", better:"hi"},
+    {label:"Revenue growth", get:d=>cagr(d.fin&&d.fin.revPrior, d.fin&&d.fin.revenue,1), fmt:v=>Math.round(v*100)+"%", better:"hi"},
+    {label:"Entry multiple", get:d=>q(d).mult||null, fmt:v=>v.toFixed(2)+"×", better:"lo"},
+    {label:"Cash-on-cash", get:d=>q(d).coc1, fmt:v=>fmtPct(v), better:"hi", color:v=>cocText(v)},
+    {label:"DSCR", get:d=>{const x=q(d).dscr; return (x!=null&&isFinite(x))?x:null;}, fmt:v=>v.toFixed(2)+"×", better:"hi", color:v=>dscrColor(v)},
+    {section:"Ratings"},
+    ...RATING_KEYS.map(([k,label])=>({label, get:d=>(d.ratings&&d.ratings[k]!=null)?d.ratings[k]:null, fmt:v=>Math.round(v), better:"hi", color:v=>scoreColor(v)})),
+  ];
+  const bestIdx=(row)=>{ if(!row.better) return -1; let bi=-1,bv=null;
+    picked.forEach((d,i)=>{ const v=row.get(d); if(v==null||isNaN(v))return;
+      if(bv==null||(row.better==="hi"?v>bv:v<bv)){bv=v;bi=i;} }); return bi; };
+
   return (
     <div className="stage"><div className="wrap">
-      <div className="eyebrow" style={{marginBottom:6}}>Pipeline</div>
-      <h2 style={{fontFamily:"Space Grotesk",fontWeight:600,fontSize:24,margin:"0 0 18px",letterSpacing:"-.01em"}}>All deals</h2>
-      <div className="pstats">
-        <div className="pstat"><div className="k">Deals</div><div className="v">{st.n}</div></div>
-        <div className="pstat"><div className="k">Avg score</div><div className="v" style={{color:scoreColor(st.avgScore)}}>{st.avgScore!=null?Math.round(st.avgScore):"—"}</div></div>
-        <div className="pstat"><div className="k">Avg entry×</div><div className="v">{st.avgMult?st.avgMult.toFixed(1)+"×":"—"}</div></div>
-        <div className="pstat"><div className="k">Avg margin</div><div className="v">{st.avgMargin!=null?Math.round(st.avgMargin*100)+"%":"—"}</div></div>
-        <div className="pstat"><div className="k">Total EBITDA</div><div className="v">{st.totalE?fmtUSD(st.totalE):"—"}</div></div>
+      <div className="eyebrow" style={{marginBottom:6}}>Compare</div>
+      <h2 style={{fontFamily:"Space Grotesk",fontWeight:600,fontSize:24,margin:"0 0 6px",letterSpacing:"-.01em"}}>Side by side</h2>
+      <p className="lead" style={{marginTop:0}}>Pick up to four deals to line up — the best value in each row is marked ★.</p>
+
+      <div className="cmp-pick">
+        {deals.map(d=>{ const on=sel.includes(d.id); return (
+          <button key={d.id} className={"cmp-chip"+(on?" on":"")} onClick={()=>toggle(d.id)}>
+            <span className="dot" style={{background:on?"var(--signal)":"#33435d"}}></span>{d.name||"Untitled"}
+          </button>); })}
       </div>
-      <div className="ptable-wrap"><table className="ptable">
-        <thead><tr>{hd("name","Company")}{hd("stage","Stage")}{hd("overall","Score",1)}{hd("verdict","Verdict")}{hd("ebitda","EBITDA",1)}{hd("mult","Entry×",1)}{hd("coc","Cash-on-cash",1)}</tr></thead>
-        <tbody>
-          {rows.map(r=>(
-            <tr key={r.d.id} onClick={()=>onPick(r.d.id)}>
-              <td><div className="pname">{r.d.name||"Untitled"}</div><div className="psub">{r.d.industry||r.d.oneLiner||""}</div></td>
-              <td onClick={e=>e.stopPropagation()}>
-                <select className="stagesel" value={r.d.stage||"New"} style={{color:stageColor(r.d.stage||"New"),borderColor:stageColor(r.d.stage||"New")}}
-                  onChange={e=>saveDeal({...r.d,stage:e.target.value})}>{STAGES.map(x=><option key={x} value={x}>{x}</option>)}</select></td>
-              <td className="r"><b className="mono" style={{color:scoreColor(r.score)}}>{r.score||"–"}</b></td>
-              <td><span style={{color:verdictColor(r.d.verdict),fontFamily:"JetBrains Mono",fontSize:11,fontWeight:700}}>{r.d.verdict||"—"}</span></td>
-              <td className="r mono">{r.ebitda?fmtUSD(r.ebitda):"—"}</td>
-              <td className="r mono">{r.mult?r.mult.toFixed(2)+"×":"—"}</td>
-              <td className="r mono" style={{color:r.coc!=null?cocText(r.coc):"var(--muted)"}}>{r.coc!=null?fmtPct(r.coc):"—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table></div>
+
+      {picked.length<2
+        ? <div className="card" style={{textAlign:"center",color:"var(--muted)"}}>Select at least two deals to compare.</div>
+        : <div className="cmp-wrap"><table className="cmp">
+          <thead><tr><th className="rowlab"></th>
+            {picked.map(d=><th key={d.id} onClick={()=>onPick(d.id)}>
+              <div className="cmp-name">{d.name||"Untitled"}</div><div className="cmp-sub">{d.industry||d.location||""}</div></th>)}
+          </tr></thead>
+          <tbody>
+            {rows.map((row,ri)=> row.section
+              ? <tr key={ri} className="cmp-sec"><td colSpan={picked.length+1}>{row.section}</td></tr>
+              : (()=>{ const bi=bestIdx(row); return (
+                <tr key={ri}>
+                  <td className="rowlab">{row.label}</td>
+                  {picked.map((d,i)=>{ const v=row.get(d);
+                    const disp=(v==null||(typeof v==="number"&&isNaN(v)))?"—":row.fmt(v);
+                    const col=(v!=null&&row.color)?row.color(v):"var(--ink)";
+                    return <td key={d.id} className={"mono"+(i===bi?" best":"")} style={{color:col}}>{disp}{i===bi?<span className="star">★</span>:null}</td>;
+                  })}
+                </tr>); })()
+            )}
+          </tbody>
+        </table></div>}
     </div></div>
   );
 }

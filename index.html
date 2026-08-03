@@ -337,6 +337,40 @@
   .wrow .wpct{color:var(--muted-2);font-family:"JetBrains Mono";font-size:12px}
   .wnote{font-size:11.5px;color:var(--watch);margin-bottom:4px}
   @media (max-width:620px){ .setgrid,.wgrid{grid-template-columns:1fr} }
+
+  /* pipeline + deal toolbar + benchmark + figures */
+  .pipebtn{margin:0 14px 6px;padding:10px 14px;border-radius:9px;border:1px solid var(--line-soft);background:transparent;color:var(--muted);font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;gap:8px}
+  .pipebtn:hover{color:var(--ink);border-color:var(--line)}
+  .pipebtn.active{color:var(--ink);background:var(--panel);border-color:var(--line)}
+  .dealbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+  .ghost.sm{padding:7px 12px;font-size:12px}
+  .ghost.danger:hover{color:var(--pass);border-color:var(--pass)}
+  .stagesel{background:var(--deck);border:1px solid var(--line-soft);border-radius:8px;padding:6px 10px;font-family:"JetBrains Mono";font-size:11px;font-weight:700;letter-spacing:.04em;cursor:pointer;outline:none}
+  .pstats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+  .pstat{background:var(--panel);border:1px solid var(--line-soft);border-radius:11px;padding:12px 16px;min-width:110px}
+  .pstat .k{font-family:"JetBrains Mono";font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted-2)}
+  .pstat .v{font-family:"JetBrains Mono";font-size:22px;font-weight:700;margin-top:4px}
+  .ptable-wrap{border:1px solid var(--line-soft);border-radius:12px;overflow-x:auto;background:var(--panel)}
+  .ptable{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
+  .ptable thead th{text-align:left;font-family:"JetBrains Mono";font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2);padding:12px 14px;border-bottom:1px solid var(--line-soft);cursor:pointer;user-select:none;white-space:nowrap}
+  .ptable th.r{text-align:right}
+  .ptable tbody td{padding:11px 14px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+  .ptable tbody tr:last-child td{border-bottom:none}
+  .ptable tbody tr{cursor:pointer;transition:.1s}
+  .ptable tbody tr:hover{background:var(--panel-2)}
+  .ptable td.r{text-align:right}
+  .ptable .mono{font-family:"JetBrains Mono"}
+  .pname{font-weight:600}
+  .psub{font-size:11px;color:var(--muted-2);margin-top:2px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bench{display:flex;gap:20px;align-items:stretch;background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;padding:12px 18px;margin-bottom:18px;flex-wrap:wrap}
+  .bcell{min-width:84px}
+  .bcell .k{font-family:"JetBrains Mono";font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2)}
+  .bcell .v{font-family:"JetBrains Mono";font-size:18px;font-weight:700;margin-top:2px}
+  .bcell .d{font-family:"JetBrains Mono";font-size:10px;margin-top:1px}
+  .fingrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .fingrid input[type=number]{width:100%;background:var(--deck);border:1px solid var(--line-soft);border-radius:9px;color:var(--ink);padding:9px 11px;font-family:"JetBrains Mono";font-size:12.5px}
+  .fingrid input[type=number]:focus{border-color:var(--cyan);outline:none}
+  @media (max-width:760px){ .fingrid{grid-template-columns:1fr 1fr} }
 </style>
 
 </head>
@@ -355,6 +389,8 @@ const GOOGLE_CLIENT_ID = "164987131312-adksaras673lf5q3m7l1emtmq1q1snsa.apps.goo
 const MODEL = "claude-sonnet-4-5";
 // 3) false = this browser only (works instantly). true = Cloudflare KV cross-device (needs setup — see README).
 const CLOUD_STORAGE = false;
+// 4) true = one SHARED team pipeline (everyone signed in sees the same deals). Needs CLOUD_STORAGE=true + KV.
+const SHARED_MODE = false;
 /* ============================================================ */
 const VERDICTS = ["PURSUE","WATCH","PASS"];
 const RATING_KEYS = [
@@ -443,7 +479,7 @@ const backend = CLOUD_STORAGE ? CloudBackend : LocalBackend;
 
 const store = {
   userId:"anon", idToken:"",
-  key(k){ return "dd:"+this.userId+":"+k; },
+  key(k){ return "dd:"+(SHARED_MODE?"team":this.userId)+":"+k; },
   async get(k){ try{ return await backend.get(this.key(k)); }catch(e){ console.error("read failed",e); return null; } },
   async set(k,v){ try{ await backend.set(this.key(k),v); return true; }catch(e){ console.error("save failed",e); return false; } },
   async del(k){ try{ await backend.del(this.key(k)); }catch(e){} },
@@ -733,6 +769,7 @@ function App({user,onSignOut}){
   const [tab,setTab]=useState("analysis");
   const [showModal,setShowModal]=useState(false);
   const [showSettings,setShowSettings]=useState(false);
+  const [route,setRoute]=useState("pipeline");
   const [settings,setSettings]=useState(CFG);
   const [railOpen,setRailOpen]=useState(false);
   const [loaded,setLoaded]=useState(false);
@@ -778,24 +815,29 @@ function App({user,onSignOut}){
   return (
     <div className="shell">
       <button className="menutoggle" onClick={()=>setRailOpen(o=>!o)}>☰</button>
-      <Rail deals={deals} activeId={activeId} loaded={loaded} user={user} onSignOut={onSignOut}
-        onPick={(id)=>{setActiveId(id);setTab("analysis");setRailOpen(false);}}
+      <Rail deals={deals} activeId={route==="deal"?activeId:null} loaded={loaded} user={user} onSignOut={onSignOut}
+        onPick={(id)=>{setActiveId(id);setTab("analysis");setRoute("deal");setRailOpen(false);}}
+        onPipeline={()=>{setRoute("pipeline");setRailOpen(false);}}
         onNew={()=>setShowModal(true)} onSettings={()=>setShowSettings(true)} open={railOpen}/>
       <div className="main">
-        {!active
-          ? <Empty onNew={()=>setShowModal(true)} loaded={loaded}/>
-          : <DealView key={active.id} deal={active} tab={tab} setTab={setTab}
-              saveDeal={saveDeal} removeDeal={removeDeal} pdfCache={pdfCache} settings={settings}/>}
+        {route==="pipeline"
+          ? <Pipeline deals={deals} saveDeal={saveDeal} onNew={()=>setShowModal(true)}
+              onPick={(id)=>{setActiveId(id);setTab("analysis");setRoute("deal");}}/>
+          : (!active
+              ? <Empty onNew={()=>setShowModal(true)} loaded={loaded}/>
+              : <DealView key={active.id} deal={active} deals={deals} tab={tab} setTab={setTab}
+                  saveDeal={saveDeal} removeDeal={removeDeal} pdfCache={pdfCache} settings={settings}
+                  onBack={()=>setRoute("pipeline")}/>)}
       </div>
       {showModal && <UploadModal onClose={()=>setShowModal(false)} addDeal={addDeal}
-          saveDeal={saveDeal} setActive={setActiveId} setTab={setTab} pdfCache={pdfCache} settings={settings}/>}
+          saveDeal={saveDeal} setActive={setActiveId} setTab={setTab} setRoute={setRoute} pdfCache={pdfCache} settings={settings}/>}
       {showSettings && <SettingsModal settings={settings} onSave={saveSettings} onClose={()=>setShowSettings(false)}/>}
     </div>
   );
 }
 
 /* ---------- Rail ---------- */
-function Rail({deals,activeId,onPick,onNew,open,loaded,user,onSignOut,onSettings}){
+function Rail({deals,activeId,onPick,onNew,open,loaded,user,onSignOut,onSettings,onPipeline}){
   return (
     <div className={"rail"+(open?" open":"")}>
       <div className="brand">
@@ -822,8 +864,12 @@ function Rail({deals,activeId,onPick,onNew,open,loaded,user,onSignOut,onSettings
         <span style={{fontSize:16,lineHeight:1}}>＋</span> Upload CIM
       </button>
 
+      <button className={"pipebtn"+(activeId==null?" active":"")} onClick={onPipeline}>
+        <span style={{fontSize:14}}>▦</span> Pipeline
+      </button>
+
       <div className="rosterhead">
-        <span className="eyebrow">Deal Pipeline</span>
+        <span className="eyebrow">Deals</span>
         <span className="eyebrow">{deals.length}</span>
       </div>
 
@@ -884,17 +930,27 @@ function Empty({onNew,loaded}){
 }
 
 /* ---------- Deal view ---------- */
-function DealView({deal,tab,setTab,saveDeal,removeDeal,pdfCache,settings}){
+function DealView({deal,deals,tab,setTab,saveDeal,removeDeal,pdfCache,settings,onBack}){
   const stageRef=useRef(null);
   useEffect(()=>{ if(stageRef.current) stageRef.current.scrollTop=0; },[tab]);
   return (
     <div className="stage" ref={stageRef}>
       <div className="wrap">
-        <DealHeader deal={deal} onDelete={()=>{ if(confirm("Remove this deal from the deck?")) removeDeal(deal.id); }}/>
+        <div className="dealbar">
+          <button className="ghost sm" onClick={onBack}>← Pipeline</button>
+          <select className="stagesel" value={deal.stage||"New"} style={{color:stageColor(deal.stage||"New"),borderColor:stageColor(deal.stage||"New")}}
+            onChange={e=>saveDeal({...deal,stage:e.target.value})}>{STAGES.map(x=><option key={x} value={x}>{x}</option>)}</select>
+          <div style={{flex:1}}></div>
+          <button className="ghost sm" onClick={()=>openMemo(deal)}>⭳ Export memo</button>
+          <button className="ghost sm danger" onClick={()=>{ if(confirm("Remove this deal from the deck?")){ removeDeal(deal.id); onBack&&onBack(); } }}>Remove</button>
+        </div>
+        <DealHeader deal={deal} onDelete={()=>{ if(confirm("Remove this deal from the deck?")){ removeDeal(deal.id); onBack&&onBack(); } }}/>
+        <BenchStrip deal={deal} deals={deals}/>
         <div className="tabs">
           <button className={"tab"+(tab==="analysis"?" active":"")} onClick={()=>setTab("analysis")}>Analysis</button>
           <button className={"tab"+(tab==="review"?" active":"")} onClick={()=>setTab("review")}>Review</button>
           <button className={"tab"+(tab==="model"?" active":"")} onClick={()=>setTab("model")}>Model</button>
+          <button className={"tab"+(tab==="diligence"?" active":"")} onClick={()=>setTab("diligence")}>Diligence</button>
           <button className={"tab"+(tab==="chat"?" active":"")} onClick={()=>setTab("chat")}>
             Ask the CIM <span className="cnt">{(deal.chat||[]).length||""}</span>
           </button>
@@ -902,6 +958,7 @@ function DealView({deal,tab,setTab,saveDeal,removeDeal,pdfCache,settings}){
         {tab==="analysis" && <Analysis deal={deal}/>}
         {tab==="review" && <Review deal={deal} saveDeal={saveDeal}/>}
         {tab==="model" && <Model deal={deal} saveDeal={saveDeal} settings={settings}/>}
+        {tab==="diligence" && <Diligence deal={deal} saveDeal={saveDeal} settings={settings}/>}
         {tab==="chat" && <Chat deal={deal} saveDeal={saveDeal} pdfCache={pdfCache} settings={settings}/>}
       </div>
     </div>
@@ -1035,6 +1092,13 @@ function Review({deal,saveDeal}){
   const addItem=(key)=>upd({[key]:[...(d[key]||[]),""]});
   const delItem=(key,i)=>upd({[key]:(d[key]||[]).filter((_,x)=>x!==i)});
   const updRating=(k,v)=>upd({ratings:{...d.ratings,[k]:+v}});
+  const updFin=(k,v)=>{
+    const fin={...(d.fin||{}), [k]: v===""?0:Number(v)};
+    const ratings={...d.ratings};
+    const fs=scoreFinancials(fin, CFG); if(fs!=null) ratings.financials=fs;
+    const overall=overallFromRatings(ratings, CFG.weights);
+    setD(p=>({...p, fin, ratings, overall: overall==null?p.overall:overall})); setSaved(false);
+  };
   const save=async()=>{ await saveDeal(d); setSaved(true); };
 
   return (
@@ -1049,6 +1113,23 @@ function Review({deal,saveDeal}){
             <input type="text" value={d.name||""} onChange={e=>upd({name:e.target.value})}/></div>
           <div className="field"><label>One-liner</label>
             <input type="text" value={d.oneLiner||""} onChange={e=>upd({oneLiner:e.target.value})}/></div>
+        </div>
+      </div>
+
+      <div className="card" style={{marginTop:16}}>
+        <h3>Reported figures <span className="tag ai">CONFIRM</span></h3>
+        <p className="lead" style={{marginTop:-6}}>Pulled from the CIM. Correct anything the AI misread — the <b>Financial quality</b> score and overall recompute from these instantly.</p>
+        <div className="fingrid">
+          {[["revenue","Revenue"],["ebitda","Adj. EBITDA"],["revPrior","Revenue (prior yr)"],["ebitdaPrior","EBITDA (prior yr)"],["netDebt","Net / LT debt"],["currentAssets","Current assets"],["currentLiab","Current liabilities"]].map(([k,label])=>(
+            <div className="field" key={k} style={{marginBottom:0}}>
+              <label>{label} ($)</label>
+              <input type="number" value={(d.fin&&d.fin[k])||0} onChange={e=>updFin(k,e.target.value)}/>
+            </div>
+          ))}
+          <div className="field" style={{marginBottom:0,alignSelf:"end"}}>
+            <label>Financial score</label>
+            <div style={{fontFamily:"JetBrains Mono",fontWeight:700,fontSize:20,color:scoreColor(d.ratings&&d.ratings.financials),padding:"6px 0"}}>{(d.ratings&&d.ratings.financials)??"–"}</div>
+          </div>
         </div>
       </div>
 
@@ -1373,7 +1454,7 @@ RISKS: ${(deal.risks||[]).join("; ")}`;
 }
 
 /* ---------- Upload modal ---------- */
-function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,pdfCache,settings}){
+function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,setRoute,pdfCache,settings}){
   const [file,setFile]=useState(null);
   const [pasted,setPasted]=useState("");
   const [over,setOver]=useState(false);
@@ -1421,7 +1502,7 @@ function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,pdfCache,setting
       };
       setProg(100); setScan("Done.");
       await addDeal(deal);
-      setTimeout(()=>{ setActive(id); setTab("analysis"); onClose(); },350);
+      setTimeout(()=>{ setActive(id); setTab("analysis"); setRoute&&setRoute("deal"); onClose(); },350);
     }catch(e){
       console.error(e);
       let base;
@@ -1550,6 +1631,197 @@ function SettingsModal({settings,onSave,onClose}){
       </div>
     </div>
   );
+}
+
+/* ================= PIPELINE · DILIGENCE · MEMO · BENCHMARK ================= */
+const STAGES=["New","Screening","Diligence","IC","Offer","Closed","Passed"];
+function stageColor(s){ return ({New:"#8496b3",Screening:"#5ab0ff",Diligence:"#ffb02e",IC:"#c084fc",Offer:"#37d9a0",Closed:"#37d9a0",Passed:"#ff5d6c"})[s]||"#8496b3"; }
+
+// quick model numbers for a deal (saved model if present, else defaults seeded from fin)
+function dealQuick(deal){
+  let ebitda = Number(deal&&deal.fin&&deal.fin.ebitda)||0;
+  let a = DEFAULT_ASSUMP, addbacks=[];
+  if(deal&&deal.model){ if(deal.model.ebitda) ebitda=deal.model.ebitda; a=deal.model.a||DEFAULT_ASSUMP; addbacks=deal.model.addbacks||[]; }
+  const haircut=addbacks.reduce((s,x)=>s+(x.amount||0)*(1-(x.keep==null?1:x.keep)),0);
+  const adjE=Math.max(ebitda-haircut,0);
+  const m = adjE>0 ? computeModel(adjE,a) : null;
+  return {adjE, mult:a.mult, coc1:m?m.coc1:null, dscr:m?m.dscr:null};
+}
+function pipeStats(deals){
+  const withE=deals.filter(d=>Number(d&&d.fin&&d.fin.ebitda)>0);
+  const avg=(arr)=>arr.length?arr.reduce((s,x)=>s+x,0)/arr.length:null;
+  const scores=deals.map(d=>Number(d.overall)).filter(x=>!isNaN(x)&&x>0);
+  const mults=deals.map(d=>dealQuick(d).mult).filter(x=>x>0);
+  const margins=withE.map(d=>d.fin.revenue?d.fin.ebitda/d.fin.revenue:null).filter(x=>x!=null);
+  const totalE=withE.reduce((s,d)=>s+Number(d.fin.ebitda),0);
+  return {n:deals.length, avgScore:avg(scores), avgMult:avg(mults), avgMargin:avg(margins), totalE};
+}
+
+function Pipeline({deals,onPick,saveDeal,onNew}){
+  const [sort,setSort]=useState({k:"overall",dir:-1});
+  const st=pipeStats(deals);
+  const rows=deals.map(d=>{ const q=dealQuick(d); return {d,coc:q.coc1,mult:q.mult,
+    ebitda:Number(d.fin&&d.fin.ebitda)||0, score:Number(d.overall)||0 }; });
+  const val=(r,k)=>({name:(r.d.name||"").toLowerCase(),stage:STAGES.indexOf(r.d.stage||"New"),overall:r.score,
+    verdict:r.d.verdict||"",ebitda:r.ebitda,mult:r.mult||0,coc:r.coc==null?-1:r.coc}[k]);
+  rows.sort((a,b)=>{ const A=val(a,sort.k),B=val(b,sort.k); if(A<B)return -sort.dir; if(A>B)return sort.dir; return 0; });
+  const hd=(k,label,r)=>(<th className={r?"r":""} onClick={()=>setSort(s=>({k,dir:s.k===k?-s.dir:(k==="name"?1:-1)}))}>
+      {label}{sort.k===k?(sort.dir<0?" ↓":" ↑"):""}</th>);
+  if(deals.length===0) return (
+    <div className="stage"><div className="wrap"><div className="empty" style={{height:"60vh"}}><div>
+      <h2>Your pipeline is empty.</h2><p>Upload a CIM to start building it.</p>
+      <button className="newbtn" style={{display:"inline-flex",width:"auto",margin:0,padding:"12px 22px"}} onClick={onNew}><span style={{fontSize:16}}>＋</span> Upload a CIM</button>
+    </div></div></div></div>);
+  return (
+    <div className="stage"><div className="wrap">
+      <div className="eyebrow" style={{marginBottom:6}}>Pipeline</div>
+      <h2 style={{fontFamily:"Space Grotesk",fontWeight:600,fontSize:24,margin:"0 0 18px",letterSpacing:"-.01em"}}>All deals</h2>
+      <div className="pstats">
+        <div className="pstat"><div className="k">Deals</div><div className="v">{st.n}</div></div>
+        <div className="pstat"><div className="k">Avg score</div><div className="v" style={{color:scoreColor(st.avgScore)}}>{st.avgScore!=null?Math.round(st.avgScore):"—"}</div></div>
+        <div className="pstat"><div className="k">Avg entry×</div><div className="v">{st.avgMult?st.avgMult.toFixed(1)+"×":"—"}</div></div>
+        <div className="pstat"><div className="k">Avg margin</div><div className="v">{st.avgMargin!=null?Math.round(st.avgMargin*100)+"%":"—"}</div></div>
+        <div className="pstat"><div className="k">Total EBITDA</div><div className="v">{st.totalE?fmtUSD(st.totalE):"—"}</div></div>
+      </div>
+      <div className="ptable-wrap"><table className="ptable">
+        <thead><tr>{hd("name","Company")}{hd("stage","Stage")}{hd("overall","Score",1)}{hd("verdict","Verdict")}{hd("ebitda","EBITDA",1)}{hd("mult","Entry×",1)}{hd("coc","Cash-on-cash",1)}</tr></thead>
+        <tbody>
+          {rows.map(r=>(
+            <tr key={r.d.id} onClick={()=>onPick(r.d.id)}>
+              <td><div className="pname">{r.d.name||"Untitled"}</div><div className="psub">{r.d.industry||r.d.oneLiner||""}</div></td>
+              <td onClick={e=>e.stopPropagation()}>
+                <select className="stagesel" value={r.d.stage||"New"} style={{color:stageColor(r.d.stage||"New"),borderColor:stageColor(r.d.stage||"New")}}
+                  onChange={e=>saveDeal({...r.d,stage:e.target.value})}>{STAGES.map(x=><option key={x} value={x}>{x}</option>)}</select></td>
+              <td className="r"><b className="mono" style={{color:scoreColor(r.score)}}>{r.score||"–"}</b></td>
+              <td><span style={{color:verdictColor(r.d.verdict),fontFamily:"JetBrains Mono",fontSize:11,fontWeight:700}}>{r.d.verdict||"—"}</span></td>
+              <td className="r mono">{r.ebitda?fmtUSD(r.ebitda):"—"}</td>
+              <td className="r mono">{r.mult?r.mult.toFixed(2)+"×":"—"}</td>
+              <td className="r mono" style={{color:r.coc!=null?cocText(r.coc):"var(--muted)"}}>{r.coc!=null?fmtPct(r.coc):"—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table></div>
+    </div></div>
+  );
+}
+
+function BenchStrip({deal,deals}){
+  const others=(deals||[]).filter(d=>d.id!==deal.id);
+  if(others.length<1) return null;
+  const st=pipeStats(deals);
+  const q=dealQuick(deal);
+  const margin=deal.fin&&deal.fin.revenue?deal.fin.ebitda/deal.fin.revenue:null;
+  const cell=(label,v,avg,fmt,better)=>{ const delta=(v!=null&&avg!=null)?v-avg:null;
+    return <div className="bcell"><div className="k">{label}</div><div className="v">{v!=null?fmt(v):"—"}</div>
+      <div className="d" style={{color:delta==null?"var(--muted-2)":(better(delta)?"var(--go)":"var(--pass)")}}>{avg!=null?"pipeline "+fmt(avg):""}</div></div>; };
+  return <div className="bench">
+    <span className="eyebrow" style={{alignSelf:"center",whiteSpace:"nowrap"}}>vs pipeline · {others.length}</span>
+    {cell("Score",Number(deal.overall)||null,st.avgScore,v=>Math.round(v),d=>d>=0)}
+    {cell("Entry×",q.mult,st.avgMult,v=>v.toFixed(1)+"×",d=>d<=0)}
+    {cell("Margin",margin,st.avgMargin,v=>Math.round(v*100)+"%",d=>d>=0)}
+  </div>;
+}
+
+function buildDiligencePrompt(deal, s){
+  return `You are a buy-side diligence lead for a permanent-hold acquirer. A CIM is written by the seller to sell — your job is to find what it does NOT say and what a buyer must independently verify.
+FIRM MANDATE: ${s.thesis}
+Return ONLY JSON:
+{
+ "redFlags": [string],     // up to 6 concrete concerns a buyer should worry about
+ "missingInfo": [string],  // up to 6 things a CIM this size should contain but this one lacks (e.g. customer contracts, churn, working-capital detail, add-back support)
+ "requests": [string],     // up to 8 specific documents/data to request in diligence
+ "questions": [string]     // up to 8 sharp questions for the seller/management call
+}
+Be specific to THIS business; each item <=18 words. No preamble, no markdown.
+
+=== DEAL: ${deal.name} ===
+${deal.digest||deal.summary}
+Known cons: ${(deal.cons||[]).join("; ")}
+Known risks: ${(deal.risks||[]).join("; ")}`;
+}
+
+function Diligence({deal,saveDeal,settings}){
+  const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
+  const dg=deal.diligence;
+  const gen=async()=>{
+    setBusy(true); setErr("");
+    try{
+      const raw=await callClaude(buildDiligencePrompt(deal,settings),{max_tokens:1500});
+      const j=parseJSON(raw);
+      await saveDeal({...deal, diligence:{redFlags:j.redFlags||[],missingInfo:j.missingInfo||[],requests:j.requests||[],questions:j.questions||[],generatedAt:Date.now()}});
+    }catch(e){ setErr(friendlyError(e)); }
+    finally{ setBusy(false); }
+  };
+  if(!dg && !busy) return (
+    <div className="card" style={{textAlign:"center",padding:"38px 24px"}}>
+      <h3 style={{justifyContent:"center"}}>Diligence pack <span className="tag ai">AI</span></h3>
+      <p className="lead" style={{maxWidth:470,margin:"0 auto 20px"}}>A skeptical, buy-side read of what the CIM leaves out — red flags, missing information, a document-request list, and sharp questions for the seller call.</p>
+      <button className="savebtn" onClick={gen}>Generate diligence pack</button>
+      {err && <div className="errbox" style={{marginTop:14,textAlign:"left"}}>{err}</div>}
+    </div>);
+  if(busy && !dg) return <div className="card"><div className="analyzing" style={{padding:30}}><div className="dots"><span></span><span></span><span></span></div><div className="scan">Reading between the lines…</div></div></div>;
+  const mark=(mcls)=>mcls==="cons"?"!":mcls==="risks"?"?":"›";
+  const List=({title,items,tag,tagcls,mcls})=>(
+    <div className="card"><h3>{title} <span className={"tag "+tagcls}>{tag}</span></h3>
+      <ul className={"pc "+mcls}>{(items||[]).map((x,i)=><li key={i}><span className="m">{mark(mcls)}</span>{x}</li>)}</ul></div>);
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,gap:12}}>
+        <p className="lead" style={{margin:0}}>Generated {dg?new Date(dg.generatedAt).toLocaleDateString():""} · a buy-side read of the CIM's gaps.</p>
+        <button className="ghost" onClick={gen} disabled={busy} style={{whiteSpace:"nowrap"}}>{busy?"Regenerating…":"Regenerate"}</button>
+      </div>
+      {err && <div className="errbox" style={{marginBottom:14}}>{err}</div>}
+      <div className="grid2" style={{marginBottom:16}}>
+        <List title="Red flags" items={dg.redFlags} tag="CONCERNS" tagcls="pass" mcls="cons"/>
+        <List title="Missing from the CIM" items={dg.missingInfo} tag="GAPS" tagcls="risk" mcls="risks"/>
+      </div>
+      <div className="card" style={{marginBottom:16}}><h3>Document requests</h3><ol className="steps">{(dg.requests||[]).map((x,i)=><li key={i}>{x}</li>)}</ol></div>
+      <div className="card"><h3>Questions for the seller call</h3><ol className="steps">{(dg.questions||[]).map((x,i)=><li key={i}>{x}</li>)}</ol></div>
+    </div>
+  );
+}
+
+function esc(x){ return String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function openMemo(deal){
+  const q=dealQuick(deal);
+  const row=(k,v)=>v?`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`:"";
+  const li=(arr)=>(arr||[]).map(x=>`<li>${esc(x)}</li>`).join("");
+  const dg=deal.diligence;
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(deal.name)} — Deal Memo</title><style>
+    *{box-sizing:border-box}body{font:13px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,sans-serif;color:#111;margin:40px;max-width:820px}
+    h1{font-size:22px;margin:0 0 2px}.sub{color:#555;margin:0 0 16px}
+    h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#0a7a55;border-bottom:2px solid #0a7a55;padding-bottom:4px;margin:22px 0 10px}
+    table{border-collapse:collapse;width:100%;margin:6px 0}td{border-bottom:1px solid #eee;padding:5px 8px;vertical-align:top}td:first-child{color:#666;width:38%}
+    .tiles{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+    .tile{border:1px solid #ddd;border-radius:8px;padding:8px 12px;min-width:112px}.tile .k{font-size:10px;color:#888;text-transform:uppercase}.tile .v{font-size:18px;font-weight:700}
+    ul,ol{margin:6px 0;padding-left:18px}li{margin:3px 0}.cols{display:flex;gap:24px}.cols>div{flex:1}
+    .verdict{display:inline-block;padding:3px 12px;border-radius:6px;font-weight:700;border:2px solid #0a7a55}
+    .foot{margin-top:30px;color:#999;font-size:10px;border-top:1px solid #eee;padding-top:8px}@media print{body{margin:0}}
+  </style></head><body>
+  <h1>${esc(deal.name||"Untitled")}</h1>
+  <p class="sub">${esc(deal.oneLiner||"")}${deal.industry?" · "+esc(deal.industry):""}${deal.location?" · "+esc(deal.location):""}</p>
+  <div class="tiles">
+    <div class="tile"><div class="k">Overall</div><div class="v">${deal.overall==null?"–":deal.overall}/100</div></div>
+    <div class="tile"><div class="k">Verdict</div><div class="v">${esc(deal.verdict||"—")}</div></div>
+    <div class="tile"><div class="k">Adj. EBITDA</div><div class="v">${q.adjE?fmtUSD(q.adjE):esc(deal.ebitda||"—")}</div></div>
+    <div class="tile"><div class="k">Entry×</div><div class="v">${q.mult?q.mult.toFixed(2)+"×":"—"}</div></div>
+    <div class="tile"><div class="k">Cash-on-cash</div><div class="v">${q.coc1!=null?Math.round(q.coc1*100)+"%":"—"}</div></div>
+    <div class="tile"><div class="k">DSCR</div><div class="v">${q.dscr!=null&&isFinite(q.dscr)?q.dscr.toFixed(2)+"×":"—"}</div></div>
+  </div>
+  <h2>Summary</h2><p>${esc(deal.summary||"")}</p>
+  <h2>Recommendation</h2><p><span class="verdict">${esc(deal.verdict||"—")}</span>&nbsp; ${esc(deal.verdictReason||"")}</p>
+  <h2>Key facts</h2><table>${row("Revenue",deal.revenue)}${row("Adj. EBITDA",deal.ebitda)}${row("Years in business",deal.years)}${row("Asking",deal.askNote)}${row("Stage",deal.stage)}</table>
+  <div class="cols"><div><h2>Pros</h2><ul>${li(deal.pros)}</ul></div><div><h2>Cons</h2><ul>${li(deal.cons)}</ul></div></div>
+  <h2>Risks</h2><ul>${li(deal.risks)}</ul>
+  <h2>Recommended next steps</h2><ol>${li(deal.nextSteps)}</ol>
+  ${dg?`<h2>Diligence — red flags</h2><ul>${li(dg.redFlags)}</ul><h2>Missing from the CIM</h2><ul>${li(dg.missingInfo)}</ul><h2>Document requests</h2><ol>${li(dg.requests)}</ol><h2>Seller-call questions</h2><ol>${li(dg.questions)}</ol>`:""}
+  ${deal.analystNotes?`<h2>Analyst notes</h2><p>${esc(deal.analystNotes)}</p>`:""}
+  <div class="foot">Deal Deck — generated ${new Date().toLocaleString()} · Confidential</div>
+  <scr`+`ipt>window.onload=function(){setTimeout(function(){window.print();},300);}</scr`+`ipt>
+  </body></html>`;
+  const w=window.open("","_blank");
+  if(!w){ alert("Allow pop-ups for this site to export the memo."); return; }
+  w.document.write(html); w.document.close();
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<Root/>);

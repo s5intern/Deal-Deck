@@ -25,8 +25,8 @@ export async function onRequest(context) {
   const key = url.searchParams.get("key");
   if (!key) return json({ error: "Missing key" }, 400);
 
-  const prefix = "dd:" + gate.sub + ":";
-  if (!key.startsWith(prefix))
+  // allow the caller's own keys, plus the shared team namespace (SHARED_MODE)
+  if (!key.startsWith("dd:" + gate.sub + ":") && !key.startsWith("dd:team:"))
     return json({ error: "Forbidden key for this account" }, 403);
 
   const kv = env.DEAL_DECK_KV;

@@ -321,6 +321,22 @@
   .solver-btn{background:linear-gradient(180deg,rgba(255,176,46,.16),rgba(255,176,46,.06));border:1px solid var(--signal-dim);
     color:var(--signal);border-radius:9px;padding:11px 16px;font-weight:600;font-size:13px;white-space:nowrap;flex:0 0 auto}
   .solver-btn:hover{background:rgba(255,176,46,.24)}
+
+  /* settings */
+  .gear{margin-left:auto;background:transparent;border:1px solid var(--line-soft);border-radius:8px;color:var(--muted);width:32px;height:32px;flex:0 0 auto;display:grid;place-items:center;font-size:15px;line-height:1}
+  .gear:hover{color:var(--signal);border-color:var(--signal-dim)}
+  .settings-modal{width:min(620px,100%);max-height:88vh;overflow-y:auto}
+  .setgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+  .settings-modal .field input[type=number]{width:100%;background:var(--deck);border:1px solid var(--line-soft);border-radius:9px;color:var(--ink);padding:10px 12px;font-family:"JetBrains Mono";font-size:13px}
+  .settings-modal .field input[type=number]:focus{border-color:var(--cyan);outline:none}
+  .wgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:8px}
+  .wrow{display:flex;align-items:center;gap:8px;background:var(--deck);border:1px solid var(--line-soft);border-radius:9px;padding:8px 12px}
+  .wrow .wlab{flex:1;font-size:12.5px}
+  .wrow input{width:58px;background:var(--panel);border:1px solid var(--line-soft);border-radius:6px;color:var(--ink);padding:6px 8px;font-family:"JetBrains Mono";font-size:13px;text-align:right}
+  .wrow input:focus{border-color:var(--cyan);outline:none}
+  .wrow .wpct{color:var(--muted-2);font-family:"JetBrains Mono";font-size:12px}
+  .wnote{font-size:11.5px;color:var(--watch);margin-bottom:4px}
+  @media (max-width:620px){ .setgrid,.wgrid{grid-template-columns:1fr} }
 </style>
 
 </head>
@@ -348,6 +364,57 @@ const RATING_KEYS = [
   ["management","Mgmt & transition"],
   ["fit","Thesis fit"],
 ];
+
+/* ---------- editable "company ideals" (Settings) ---------- */
+const DEFAULT_SETTINGS = {
+  thesis: "A permanent-hold investment firm that buys controlling interests in durable, cash-flow-generating small businesses — typically blue-collar / \"moves atoms\" (trades, manufacturing, service). No fund clock: returns come from ongoing distributions, not a future sale.",
+  ebitdaMin: 2, ebitdaMax: 10,      // $M sweet spot
+  multLow: 4, multHigh: 6,          // entry multiple band (x)
+  cocTarget: 25,                    // % cash-on-cash target
+  dscrFloor: 1.5,                   // x minimum debt-service coverage
+  focus: "",                        // preferred sectors / attributes (free text)
+  avoid: "",                        // deal-breakers (free text)
+  weights: { financials:30, market:15, moat:20, management:10, fit:25 }, // % of overall
+};
+function normSettings(s){
+  const d=DEFAULT_SETTINGS;
+  const m=Object.assign({}, d, s||{});
+  m.weights=Object.assign({}, d.weights, (s&&s.weights)||{});
+  return m;
+}
+// module mirror so non-component code (prompt builders, scoring) can read current settings
+let CFG = normSettings(null);
+
+// Deterministic financial-quality score (0-100) from the extracted numbers.
+// Intrinsic to the business (margin, growth, leverage, earnings quality) — independent of price.
+function scoreFinancials(fin, s){
+  if(!fin) return null;
+  const E=Number(fin.ebitda)||0, R=Number(fin.revenue)||0;
+  if(E<=0 && R<=0) return null;
+  let pts=50;
+  // margin
+  const margin = R>0 ? E/R : null;
+  if(margin!=null){ pts += margin<0.08?-16 : margin<0.15?-6 : margin<0.25?6 : margin<0.40?13 : 18; }
+  // revenue growth (YoY)
+  const rg = cagr(fin.revPrior, fin.revenue, 1);
+  if(rg!=null){ pts += rg<0?-14 : rg<0.05?0 : rg<0.15?8 : rg<0.30?14 : 12; }
+  // ebitda growth (YoY)
+  const eg = cagr(fin.ebitdaPrior, fin.ebitda, 1);
+  if(eg!=null){ pts += eg<0?-8 : eg<0.10?2 : eg<0.30?7 : 9; }
+  // size vs sweet spot ($M)
+  if(E>0){ const em=E/1e6; const lo=s.ebitdaMin, hi=s.ebitdaMax;
+    pts += (em>=lo&&em<=hi)?8 : (em>=lo*0.5&&em<=hi*2)?2 : -6; }
+  // leverage
+  const nd=Number(fin.netDebt)||0;
+  if(E>0){ const lev=nd/E; pts += lev<=0?4 : lev<1?6 : lev<3?0 : lev<4?-6 : -12; }
+  // liquidity
+  const ca=Number(fin.currentAssets)||0, cl=Number(fin.currentLiab)||0;
+  if(cl>0){ const cr=ca/cl; pts += cr>=1.5?4 : cr>=1?0 : -6; }
+  // earnings quality: add-back reliance
+  const ab=(fin.addbacks||[]).reduce((t,x)=>t+(Number(x.amount)||0),0);
+  if(E>0){ const r=ab/E; pts += r>0.15?-8 : r>0.05?-3 : 2; }
+  return clamp(pts);
+}
 
 /* ---------- storage helpers ---------- */
 /* ---------- auth helpers ---------- */
@@ -451,7 +518,11 @@ async function extractPdfText(file, onProgress){
   return out.trim();
 }
 
-const ANALYSIS_PROMPT = `You are the lead analyst on the deals team. The firm is a permanent-hold investment firm that buys controlling interests in durable, cash-flow-generating small businesses — typically $2–10M EBITDA, bought at 4–6x, blue-collar / "moves atoms" (trades, manufacturing, service). No fund clock: returns come from ongoing distributions (~25% cash-on-cash target), not exits. Judge this deal against THAT thesis.
+function buildAnalysisPrompt(s){ return `You are the lead analyst on the deals team.
+
+FIRM MANDATE: ${s.thesis}
+FINANCIAL HURDLES: entry ${s.multLow}–${s.multHigh}× adjusted EBITDA · target ${s.cocTarget}% cash-on-cash · minimum ${s.dscrFloor}× debt-service coverage · EBITDA sweet spot $${s.ebitdaMin}–${s.ebitdaMax}M.${s.focus?`\nPREFERRED / FOCUS: ${s.focus}`:""}${s.avoid?`\nDEAL-BREAKERS: ${s.avoid}`:""}
+Judge this deal against THAT mandate.
 
 Read the attached Confidential Information Memorandum and return ONLY a JSON object (no markdown, no prose) with EXACTLY these keys:
 {
@@ -498,8 +569,8 @@ The five dimensions measure DIFFERENT things, so their scores should differ from
   - market: industry durability, demand, cyclicality, fragmentation
   - moat: switching costs, licensing, capability barriers, customer stickiness
   - management: depth below the owner, transition/key-person risk
-  - fit: match to the firm's strategy (permanent hold, $2-10M EBITDA, 4-6x, blue-collar, cash generative)
-Most real deals land in the 50-70 range. Reserve 80+ for genuinely excellent attributes and use sub-45 when warranted. DO NOT default every score to ~75 — a flat, uniform score set is a failure.`;
+  - fit: match to the firm mandate and hurdles stated above
+Most real deals land in the 50-70 range. Reserve 80+ for genuinely excellent attributes and use sub-45 when warranted. DO NOT default every score to ~75 — a flat, uniform score set is a failure. The financials score may be recomputed from the extracted numbers, so focus your judgment on making market, moat, management, and fit clearly differ from one another.`; }
 
 const DIGEST_PROMPT = `You are briefing the deals team. Read the attached CIM and write a dense ~230-word factual digest capturing: what the company does, financials (revenue, EBITDA, margins, growth), customers & concentration, operations/assets, management & transition, deal structure, and notable risks. Plain text, no headers, no preamble. This will ground later Q&A, so pack in the concrete facts and numbers.`;
 
@@ -661,11 +732,15 @@ function App({user,onSignOut}){
   const [activeId,setActiveId]=useState(null);
   const [tab,setTab]=useState("analysis");
   const [showModal,setShowModal]=useState(false);
+  const [showSettings,setShowSettings]=useState(false);
+  const [settings,setSettings]=useState(CFG);
   const [railOpen,setRailOpen]=useState(false);
   const [loaded,setLoaded]=useState(false);
   const pdfCache = useRef({}); // id -> base64 (session only)
 
   useEffect(()=>{ (async()=>{
+    const savedS = normSettings(await store.get("settings"));
+    CFG = savedS; setSettings(savedS);
     const idx = await store.get("deal_index") || [];
     const full = [];
     for(const meta of idx){ const d = await store.get("deal_"+meta.id); if(d) full.push(d); }
@@ -696,26 +771,31 @@ function App({user,onSignOut}){
 
   const active = deals.find(d=>d.id===activeId)||null;
 
+  const saveSettings = useCallback(async(next)=>{
+    const n=normSettings(next); CFG=n; setSettings(n); await store.set("settings", n);
+  },[]);
+
   return (
     <div className="shell">
       <button className="menutoggle" onClick={()=>setRailOpen(o=>!o)}>☰</button>
       <Rail deals={deals} activeId={activeId} loaded={loaded} user={user} onSignOut={onSignOut}
         onPick={(id)=>{setActiveId(id);setTab("analysis");setRailOpen(false);}}
-        onNew={()=>setShowModal(true)} open={railOpen}/>
+        onNew={()=>setShowModal(true)} onSettings={()=>setShowSettings(true)} open={railOpen}/>
       <div className="main">
         {!active
           ? <Empty onNew={()=>setShowModal(true)} loaded={loaded}/>
           : <DealView key={active.id} deal={active} tab={tab} setTab={setTab}
-              saveDeal={saveDeal} removeDeal={removeDeal} pdfCache={pdfCache}/>}
+              saveDeal={saveDeal} removeDeal={removeDeal} pdfCache={pdfCache} settings={settings}/>}
       </div>
       {showModal && <UploadModal onClose={()=>setShowModal(false)} addDeal={addDeal}
-          saveDeal={saveDeal} setActive={setActiveId} setTab={setTab} pdfCache={pdfCache}/>}
+          saveDeal={saveDeal} setActive={setActiveId} setTab={setTab} pdfCache={pdfCache} settings={settings}/>}
+      {showSettings && <SettingsModal settings={settings} onSave={saveSettings} onClose={()=>setShowSettings(false)}/>}
     </div>
   );
 }
 
 /* ---------- Rail ---------- */
-function Rail({deals,activeId,onPick,onNew,open,loaded,user,onSignOut}){
+function Rail({deals,activeId,onPick,onNew,open,loaded,user,onSignOut,onSettings}){
   return (
     <div className={"rail"+(open?" open":"")}>
       <div className="brand">
@@ -730,6 +810,7 @@ function Rail({deals,activeId,onPick,onNew,open,loaded,user,onSignOut}){
           <h1>Deal Deck</h1>
           <div className="sub">Deal Review</div>
         </div>
+        <button className="gear" onClick={onSettings} title="Settings">⚙</button>
       </div>
 
       <div className="secure">
@@ -803,7 +884,7 @@ function Empty({onNew,loaded}){
 }
 
 /* ---------- Deal view ---------- */
-function DealView({deal,tab,setTab,saveDeal,removeDeal,pdfCache}){
+function DealView({deal,tab,setTab,saveDeal,removeDeal,pdfCache,settings}){
   const stageRef=useRef(null);
   useEffect(()=>{ if(stageRef.current) stageRef.current.scrollTop=0; },[tab]);
   return (
@@ -820,8 +901,8 @@ function DealView({deal,tab,setTab,saveDeal,removeDeal,pdfCache}){
         </div>
         {tab==="analysis" && <Analysis deal={deal}/>}
         {tab==="review" && <Review deal={deal} saveDeal={saveDeal}/>}
-        {tab==="model" && <Model deal={deal} saveDeal={saveDeal}/>}
-        {tab==="chat" && <Chat deal={deal} saveDeal={saveDeal} pdfCache={pdfCache}/>}
+        {tab==="model" && <Model deal={deal} saveDeal={saveDeal} settings={settings}/>}
+        {tab==="chat" && <Chat deal={deal} saveDeal={saveDeal} pdfCache={pdfCache} settings={settings}/>}
       </div>
     </div>
   );
@@ -1040,7 +1121,7 @@ function cocCellBg(v){ if(v>=0.25) return "rgba(55,217,160,.22)"; if(v>=0.15) re
 function cocText(v){ if(v>=0.25) return "var(--go)"; if(v>=0.15) return "var(--watch)"; return "var(--pass)"; }
 function dscrColor(v){ if(v>=1.5) return "var(--go)"; if(v>=1.25) return "var(--watch)"; return "var(--pass)"; }
 
-function Model({deal,saveDeal}){
+function Model({deal,saveDeal,settings}){
   const fin=deal.fin||{};
   const build=()=> deal.model || {
     ebitda:Number(fin.ebitda)||0,
@@ -1063,10 +1144,12 @@ function Model({deal,saveDeal}){
   const adjE=Math.max(ebitda-haircut,0);
   const m=computeModel(adjE,a);
 
-  const COC_TARGET=0.25, DSCR_FLOOR=1.5;
-  const passCoC=m.coc1>=COC_TARGET, passDSCR=(!isFinite(m.dscr)||m.dscr>=DSCR_FLOOR), inBand=a.mult>=4&&a.mult<=6;
+  const COC_TARGET=(Number(settings?.cocTarget)||25)/100, DSCR_FLOOR=Number(settings?.dscrFloor)||1.5;
+  const bandLo=Number(settings?.multLow)||4, bandHi=Number(settings?.multHigh)||6;
+  const passCoC=m.coc1>=COC_TARGET, passDSCR=(!isFinite(m.dscr)||m.dscr>=DSCR_FLOOR), inBand=a.mult>=bandLo&&a.mult<=bandHi;
   const clears=passCoC&&passDSCR;
-  const readState = adjE<=0 ? "ENTER EBITDA TO MODEL" : clears ? (inBand?"CLEARS THE HURDLES":"WORKS — PRICED ABOVE 4–6× BAND") : "BELOW THE HURDLES";
+  const bandTxt=`${bandLo}–${bandHi}×`;
+  const readState = adjE<=0 ? "ENTER EBITDA TO MODEL" : clears ? (inBand?"CLEARS THE HURDLES":`WORKS — PRICED ABOVE ${bandTxt} BAND`) : "BELOW THE HURDLES";
   const readColor = adjE<=0 ? "var(--muted)" : clears ? (inBand?"var(--go)":"var(--watch)") : "var(--pass)";
   const maxMult = adjE>0 ? maxEntryMultiple(adjE,a,COC_TARGET,DSCR_FLOOR) : null;
   const maxPriceUSD = maxMult!=null ? adjE*maxMult : null;
@@ -1096,14 +1179,14 @@ function Model({deal,saveDeal}){
           <span className="s5read-txt">
             {adjE<=0
               ? "Add the CIM's adjusted EBITDA below and the whole model comes alive."
-              : <>At <b>{a.mult.toFixed(2)}×</b> with <b>{(a.lev*100).toFixed(0)}%</b> debt, this returns <b style={{color:cocText(m.coc1)}}>{fmtPct(m.coc1)}</b> Yr-1 cash-on-cash{isFinite(m.dscr)?<> at <b style={{color:dscrColor(m.dscr)}}>{m.dscr.toFixed(2)}×</b> coverage</>:" (all-equity, no debt)"}. Target is ≥25% and ≥1.5×.</>}
+              : <>At <b>{a.mult.toFixed(2)}×</b> with <b>{(a.lev*100).toFixed(0)}%</b> debt, this returns <b style={{color:cocText(m.coc1)}}>{fmtPct(m.coc1)}</b> Yr-1 cash-on-cash{isFinite(m.dscr)?<> at <b style={{color:dscrColor(m.dscr)}}>{m.dscr.toFixed(2)}×</b> coverage</>:" (all-equity, no debt)"}. Target is ≥{settings?.cocTarget||25}% and ≥{(settings?.dscrFloor||1.5)}×.</>}
           </span>
         </div>
       </div>
 
       {adjE>0 && <div className="solver">
         <div className="solver-main">
-          <div className="k">Most you should pay <span className="q" title="Highest entry price that still clears ≥25% cash-on-cash and ≥1.5× DSCR at your current leverage and operating assumptions.">ⓘ</span></div>
+          <div className="k">Most you should pay <span className="q" title={`Highest entry price that still clears ≥${settings?.cocTarget||25}% cash-on-cash and ≥${settings?.dscrFloor||1.5}× DSCR at your current leverage and operating assumptions.`}>ⓘ</span></div>
           {maxMult!=null
             ? <div className="solver-val">{fmtUSD(maxPriceUSD)} <span className="solver-x">{maxMult.toFixed(2)}× adj. EBITDA</span></div>
             : <div className="solver-val" style={{color:"var(--pass)"}}>No price clears both hurdles <span className="solver-x">at these assumptions</span></div>}
@@ -1123,7 +1206,7 @@ function Model({deal,saveDeal}){
           <div className="big">{fmtUSD(m.equity)}</div><div className="sub">{fmtUSD(m.debt)} debt @ {(a.rate*100).toFixed(1)}%</div></div>
         <div className="kpi"><div className="k">Yr-1 cash-on-cash</div>
           <div className="big" style={{color:cocText(m.coc1)}}>{fmtPct(m.coc1)}</div>
-          <div className="sub">target ≥ 25%</div></div>
+          <div className="sub">target ≥ {settings?.cocTarget||25}%</div></div>
         <div className="kpi"><div className="k">DSCR (Yr 1)</div>
           <div className="big" style={{color:dscrColor(m.dscr)}}>{isFinite(m.dscr)?m.dscr.toFixed(2)+"×":"n/a"}</div>
           <div className="sub">covenant floor ~1.25×</div></div>
@@ -1219,7 +1302,7 @@ function Model({deal,saveDeal}){
   );
 }
 
-function Chat({deal,saveDeal,pdfCache}){
+function Chat({deal,saveDeal,pdfCache,settings}){
   const [messages,setMessages]=useState(deal.chat||[]);
   const [input,setInput]=useState("");
   const [busy,setBusy]=useState(false);
@@ -1228,7 +1311,10 @@ function Chat({deal,saveDeal,pdfCache}){
   useEffect(()=>{setMessages(deal.chat||[]);},[deal.id]);
   useEffect(()=>{ if(scrollRef.current) scrollRef.current.scrollTop=scrollRef.current.scrollHeight; },[messages,busy]);
 
-  const system = `You are a deal analyst assistant, answering questions about ONE specific CIM for the deals team. The firm is a permanent-hold investor buying durable small businesses ($2-10M EBITDA, 4-6x, blue-collar, returns via distributions not exits). Ground every answer in the deal facts below; if something isn't covered, say it's not in the CIM and flag it as a diligence item. Be concise, specific, and honest about tradeoffs.
+  const system = `You are a deal analyst assistant, answering questions about ONE specific CIM for the deals team.
+FIRM MANDATE: ${settings.thesis}
+HURDLES: entry ${settings.multLow}–${settings.multHigh}× · ${settings.cocTarget}% cash-on-cash · ${settings.dscrFloor}× DSCR · EBITDA $${settings.ebitdaMin}–${settings.ebitdaMax}M.${settings.avoid?` Deal-breakers: ${settings.avoid}.`:""}
+Ground every answer in the deal facts below; if something isn't covered, say it's not in the CIM and flag it as a diligence item. Be concise, specific, and honest about tradeoffs.
 
 === DEAL: ${deal.name} ===
 ${deal.digest||deal.summary}
@@ -1287,7 +1373,7 @@ RISKS: ${(deal.risks||[]).join("; ")}`;
 }
 
 /* ---------- Upload modal ---------- */
-function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,pdfCache}){
+function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,pdfCache,settings}){
   const [file,setFile]=useState(null);
   const [pasted,setPasted]=useState("");
   const [over,setOver]=useState(false);
@@ -1312,21 +1398,24 @@ function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,pdfCache}){
       }
       setProg(26);
       setScan("Extracting facts against the investment thesis…");
-      const analysisInput = ANALYSIS_PROMPT+"\n\nCIM TEXT:\n"+text;
+      const analysisInput = buildAnalysisPrompt(settings)+"\n\nCIM TEXT:\n"+text;
       const digestInput   = DIGEST_PROMPT+"\n\nCIM TEXT:\n"+text;
       const aRaw = await callClaude(analysisInput, {});
       setProg(58); setScan("Writing the briefing digest…");
       const digest = await callClaude(digestInput, {});
       setProg(80); setScan("Scoring…");
       const a=parseJSON(aRaw);
+      const ratings = a.ratings || {financials:0,market:0,moat:0,management:0,fit:0};
+      const fs = scoreFinancials(a.fin, CFG);           // real math from extracted numbers
+      if(fs!=null) ratings.financials = fs;             // override the model's flat guess
       const deal={
         id, createdAt:Date.now(), status:"ready", chat:[], analystNotes:"", digest,
         name:a.name||file?.name?.replace(/\.pdf$/i,"")||"Untitled CIM",
         oneLiner:a.oneLiner||"", industry:a.industry||"", location:a.location||"",
         revenue:a.revenue||"", ebitda:a.ebitda||"", years:a.years||"", askNote:a.askNote||"Not disclosed",
         summary:a.summary||"", pros:a.pros||[], cons:a.cons||[], risks:a.risks||[],
-        ratings:a.ratings||{financials:0,market:0,moat:0,management:0,fit:0},
-        overall:overallFromRatings(a.ratings) ?? clamp(a.overall), verdict:VERDICTS.includes(a.verdict)?a.verdict:"WATCH",
+        ratings,
+        overall:overallFromRatings(ratings, CFG.weights) ?? clamp(a.overall), verdict:VERDICTS.includes(a.verdict)?a.verdict:"WATCH",
         verdictReason:a.verdictReason||"", nextSteps:a.nextSteps||[],
         fin:a.fin||{}, model:null,
       };
@@ -1401,12 +1490,66 @@ function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,pdfCache}){
 function clamp(n){ n=+n; if(isNaN(n)) return 0; return Math.max(0,Math.min(100,Math.round(n))); }
 // Headline score, computed from the sub-ratings (weighted to the firm's priorities) rather
 // than trusted from the model — which otherwise flattens everything to ~75.
-function overallFromRatings(r){
+function overallFromRatings(r, weights){
   if(!r || typeof r!=="object") return null;
-  const w={financials:0.30, fit:0.25, moat:0.20, market:0.15, management:0.10};
+  const w = weights || CFG.weights;
   let sum=0, wsum=0;
-  for(const k in w){ const v=Number(r[k]); if(!isNaN(v)){ sum+=v*w[k]; wsum+=w[k]; } }
+  for(const k in w){ const v=Number(r[k]); const wt=Number(w[k])||0; if(!isNaN(v)&&wt>0){ sum+=v*wt; wsum+=wt; } }
   return wsum>0 ? clamp(sum/wsum) : null;
+}
+
+function SettingsModal({settings,onSave,onClose}){
+  const [s,setS]=useState(normSettings(settings));
+  const set=(k,v)=>setS(p=>({...p,[k]:v}));
+  const setW=(k,v)=>setS(p=>({...p,weights:{...p.weights,[k]:Math.max(0,+v||0)}}));
+  const wsum=RATING_KEYS.reduce((t,[k])=>t+(Number(s.weights[k])||0),0);
+  const save=()=>{ onSave(s); onClose(); };
+  return (
+    <div className="backdrop" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div className="modal settings-modal">
+        <div className="eyebrow" style={{marginBottom:8}}>Company ideals</div>
+        <h2>Settings</h2>
+        <p className="sub">These drive how the AI reads every CIM — the mandate it judges against, your hurdles, and how the score is weighted. Changes apply to new analyses and to the Model tab.</p>
+
+        <div className="field"><label>Investment thesis / mandate</label>
+          <textarea rows="4" value={s.thesis} onChange={e=>set("thesis",e.target.value)}/></div>
+
+        <div className="setgrid">
+          <div className="field"><label>EBITDA sweet spot — min ($M)</label><input type="number" step="0.5" value={s.ebitdaMin} onChange={e=>set("ebitdaMin",+e.target.value)}/></div>
+          <div className="field"><label>EBITDA sweet spot — max ($M)</label><input type="number" step="0.5" value={s.ebitdaMax} onChange={e=>set("ebitdaMax",+e.target.value)}/></div>
+          <div className="field"><label>Entry multiple — low (×)</label><input type="number" step="0.25" value={s.multLow} onChange={e=>set("multLow",+e.target.value)}/></div>
+          <div className="field"><label>Entry multiple — high (×)</label><input type="number" step="0.25" value={s.multHigh} onChange={e=>set("multHigh",+e.target.value)}/></div>
+          <div className="field"><label>Target cash-on-cash (%)</label><input type="number" step="1" value={s.cocTarget} onChange={e=>set("cocTarget",+e.target.value)}/></div>
+          <div className="field"><label>Minimum DSCR (×)</label><input type="number" step="0.05" value={s.dscrFloor} onChange={e=>set("dscrFloor",+e.target.value)}/></div>
+        </div>
+
+        <div className="field"><label>Preferred sectors / attributes (optional)</label>
+          <textarea rows="2" placeholder="e.g. essential trades, recurring maintenance revenue, licensed/permitted work…" value={s.focus} onChange={e=>set("focus",e.target.value)}/></div>
+        <div className="field"><label>Deal-breakers (optional)</label>
+          <textarea rows="2" placeholder="e.g. heavy customer concentration, tech-obsolescence risk, leverage above 4×…" value={s.avoid} onChange={e=>set("avoid",e.target.value)}/></div>
+
+        <div className="field" style={{marginBottom:6}}><label>Overall-score weights — how much each dimension counts (now {wsum}%)</label></div>
+        <div className="wgrid">
+          {RATING_KEYS.map(([k,label])=>(
+            <div className="wrow" key={k}>
+              <span className="wlab">{label}</span>
+              <input type="number" min="0" max="100" value={s.weights[k]} onChange={e=>setW(k,e.target.value)}/>
+              <span className="wpct">%</span>
+            </div>
+          ))}
+        </div>
+        {Math.abs(wsum-100)>0.5 && <div className="wnote">Weights total {wsum}% — they're normalized automatically, but 100% is tidiest.</div>}
+        <p className="lead" style={{margin:"10px 0 0"}}>Note: the <b>Financial quality</b> score is computed from the CIM's numbers (margin, growth, leverage), not guessed — so it's grounded regardless of weight.</p>
+
+        <div className="mfoot">
+          <button className="ghost" onClick={()=>setS(normSettings(null))}>Reset to defaults</button>
+          <div style={{flex:1}}></div>
+          <button className="ghost" onClick={onClose}>Cancel</button>
+          <button className="primary" onClick={save}>Save settings</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<Root/>);

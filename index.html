@@ -1093,11 +1093,15 @@ function Review({deal,saveDeal}){
   const delItem=(key,i)=>upd({[key]:(d[key]||[]).filter((_,x)=>x!==i)});
   const updRating=(k,v)=>upd({ratings:{...d.ratings,[k]:+v}});
   const updFin=(k,v)=>{
-    const fin={...(d.fin||{}), [k]: v===""?0:Number(v)};
+    const num=v===""?0:Number(v);
+    const fin={...(d.fin||{}), [k]: num};
     const ratings={...d.ratings};
     const fs=scoreFinancials(fin, CFG); if(fs!=null) ratings.financials=fs;
     const overall=overallFromRatings(ratings, CFG.weights);
-    setD(p=>({...p, fin, ratings, overall: overall==null?p.overall:overall})); setSaved(false);
+    const patch={ fin, ratings, overall: overall==null?d.overall:overall };
+    if(k==="ebitda" && num>0) patch.ebitda=fmtUSD(num);
+    if(k==="revenue" && num>0) patch.revenue=fmtUSD(num);
+    setD(p=>({...p, ...patch})); setSaved(false);
   };
   const save=async()=>{ await saveDeal(d); setSaved(true); };
 
@@ -1204,11 +1208,11 @@ function dscrColor(v){ if(v>=1.5) return "var(--go)"; if(v>=1.25) return "var(--
 
 function Model({deal,saveDeal,settings}){
   const fin=deal.fin||{};
-  const build=()=> deal.model || {
-    ebitda:Number(fin.ebitda)||0,
-    addbacks:(fin.addbacks||[]).map(x=>({label:x.label||"Add-back",amount:Number(x.amount)||0,keep:1})),
-    a:{...DEFAULT_ASSUMP},
-  };
+  const build=()=>({
+    ebitda: dealEbitda(deal),
+    addbacks: (deal.model&&deal.model.addbacks) || (fin.addbacks||[]).map(x=>({label:x.label||"Add-back",amount:Number(x.amount)||0,keep:1})),
+    a: (deal.model&&deal.model.a) || {...DEFAULT_ASSUMP},
+  });
   const [ebitda,setEbitda]=useState(build().ebitda);
   const [addbacks,setAddbacks]=useState(build().addbacks);
   const [a,setA]=useState(build().a);
@@ -1216,7 +1220,7 @@ function Model({deal,saveDeal,settings}){
 
   const timer=useRef();
   useEffect(()=>{ clearTimeout(timer.current);
-    timer.current=setTimeout(()=>saveDeal({...deal,model:{ebitda,addbacks,a}}),700);
+    timer.current=setTimeout(()=>saveDeal({...deal, ...(ebitda>0?{ebitda:fmtUSD(ebitda)}:{}), fin:{...deal.fin, ebitda}, model:{ebitda,addbacks,a}}),700);
     return ()=>clearTimeout(timer.current);
   },[ebitda,addbacks,a]);
 
@@ -1637,15 +1641,37 @@ function SettingsModal({settings,onSave,onClose}){
 const STAGES=["New","Screening","Diligence","IC","Offer","Closed","Passed"];
 function stageColor(s){ return ({New:"#8496b3",Screening:"#5ab0ff",Diligence:"#ffb02e",IC:"#c084fc",Offer:"#37d9a0",Closed:"#37d9a0",Passed:"#ff5d6c"})[s]||"#8496b3"; }
 
+// parse "$2.4M", "$395.2 million", "12,163,791" -> number
+function parseMoney(str){
+  if(str==null) return 0;
+  if(typeof str==="number") return str;
+  const s=String(str).replace(/,/g,"");
+  const m=s.match(/(-?\d+(?:\.\d+)?)\s*(k|m|b|thousand|million|billion)?/i);
+  if(!m) return 0;
+  let n=parseFloat(m[1]); const u=(m[2]||"").toLowerCase();
+  if(u==="k"||u==="thousand") n*=1e3;
+  else if(u==="m"||u==="million") n*=1e6;
+  else if(u==="b"||u==="billion") n*=1e9;
+  return n;
+}
+// single source of truth for a deal's reported EBITDA (numeric)
+function dealEbitda(deal){
+  const f=Number(deal&&deal.fin&&deal.fin.ebitda)||0;
+  if(f>0) return f;
+  const mm=Number(deal&&deal.model&&deal.model.ebitda)||0;
+  if(mm>0) return mm;
+  return parseMoney(deal&&deal.ebitda);
+}
+
 // quick model numbers for a deal (saved model if present, else defaults seeded from fin)
 function dealQuick(deal){
-  let ebitda = Number(deal&&deal.fin&&deal.fin.ebitda)||0;
-  let a = DEFAULT_ASSUMP, addbacks=[];
-  if(deal&&deal.model){ if(deal.model.ebitda) ebitda=deal.model.ebitda; a=deal.model.a||DEFAULT_ASSUMP; addbacks=deal.model.addbacks||[]; }
+  let ebitda = dealEbitda(deal);
+  let a = (deal&&deal.model&&deal.model.a) || DEFAULT_ASSUMP;
+  let addbacks = (deal&&deal.model&&deal.model.addbacks) || [];
   const haircut=addbacks.reduce((s,x)=>s+(x.amount||0)*(1-(x.keep==null?1:x.keep)),0);
   const adjE=Math.max(ebitda-haircut,0);
   const m = adjE>0 ? computeModel(adjE,a) : null;
-  return {adjE, mult:a.mult, coc1:m?m.coc1:null, dscr:m?m.dscr:null};
+  return {adjE, baseE:ebitda, mult:a.mult, coc1:m?m.coc1:null, dscr:m?m.dscr:null};
 }
 function pipeStats(deals){
   const withE=deals.filter(d=>Number(d&&d.fin&&d.fin.ebitda)>0);
@@ -1661,7 +1687,7 @@ function Pipeline({deals,onPick,saveDeal,onNew}){
   const [sort,setSort]=useState({k:"overall",dir:-1});
   const st=pipeStats(deals);
   const rows=deals.map(d=>{ const q=dealQuick(d); return {d,coc:q.coc1,mult:q.mult,
-    ebitda:Number(d.fin&&d.fin.ebitda)||0, score:Number(d.overall)||0 }; });
+    ebitda:dealEbitda(d), score:Number(d.overall)||0 }; });
   const val=(r,k)=>({name:(r.d.name||"").toLowerCase(),stage:STAGES.indexOf(r.d.stage||"New"),overall:r.score,
     verdict:r.d.verdict||"",ebitda:r.ebitda,mult:r.mult||0,coc:r.coc==null?-1:r.coc}[k]);
   rows.sort((a,b)=>{ const A=val(a,sort.k),B=val(b,sort.k); if(A<B)return -sort.dir; if(A>B)return sort.dir; return 0; });

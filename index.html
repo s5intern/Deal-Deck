@@ -16,6 +16,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
   :root{
@@ -33,7 +34,7 @@
     --go:#3ddc9a;          /* PURSUE (kept green for meaning) */
     --watch:#ffd23f;       /* WATCH */
     --pass:#ff5d78;        /* PASS */
-    --cyan:#a970ff;        /* AI / chat / secondary - now violet */
+    --cyan:#a970ff;        /* AI / chat / secondary — now violet */
     --grid: rgba(169,112,255,.06);
   }
   *{box-sizing:border-box}
@@ -160,7 +161,7 @@
   .rrow .rl .name{font-size:12.5px;font-weight:500}
   .rrow .rl .num{font-family:"JetBrains Mono";font-weight:700;font-size:12.5px}
   .bar{height:7px;border-radius:4px;background:var(--deck);overflow:hidden;border:1px solid var(--line-soft)}
-  .bar > i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--cyan),var(--go));transition:width .6s cubic-bezier(.2,.7,.2,1)}
+  .bar > i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#7c4dff,var(--cyan));transition:width .6s cubic-bezier(.2,.7,.2,1)}
   input[type=range]{-webkit-appearance:none;width:100%;height:7px;border-radius:4px;background:var(--deck);border:1px solid var(--line-soft);outline:none;margin:0}
   input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--signal);border:2px solid var(--void);cursor:pointer;box-shadow:0 0 8px -2px var(--signal)}
 
@@ -424,13 +425,13 @@
 const {useState,useEffect,useRef,useCallback} = React;
 
 /* ============================================================
-   CONFIG  - edit these three, then deploy.
+   CONFIG  — edit these three, then deploy.
    ============================================================ */
 // 1) Paste your Google OAuth Client ID (ends in .apps.googleusercontent.com)
 const GOOGLE_CLIENT_ID = "164987131312-adksaras673lf5q3m7l1emtmq1q1snsa.apps.googleusercontent.com";
 // 2) A model available on YOUR Anthropic account (see docs.claude.com models page)
 const MODEL = "claude-sonnet-4-5";
-// 3) false = this browser only (works instantly). true = Cloudflare KV cross-device (needs setup - see README).
+// 3) false = this browser only (works instantly). true = Cloudflare KV cross-device (needs setup — see README).
 const CLOUD_STORAGE = false;
 // 4) true = one SHARED team pipeline (everyone signed in sees the same deals). Needs CLOUD_STORAGE=true + KV.
 const SHARED_MODE = false;
@@ -446,7 +447,7 @@ const RATING_KEYS = [
 
 /* ---------- editable "company ideals" (Settings) ---------- */
 const DEFAULT_SETTINGS = {
-  thesis: "A permanent-hold investment firm that buys controlling interests in durable, cash-flow-generating small businesses - typically blue-collar / \"moves atoms\" (trades, manufacturing, service). No fund clock: returns come from ongoing distributions, not a future sale.",
+  thesis: "A permanent-hold investment firm that buys controlling interests in durable, cash-flow-generating small businesses — typically blue-collar / \"moves atoms\" (trades, manufacturing, service). No fund clock: returns come from ongoing distributions, not a future sale.",
   ebitdaMin: 2, ebitdaMax: 10,      // $M sweet spot
   multLow: 4, multHigh: 6,          // entry multiple band (x)
   cocTarget: 25,                    // % cash-on-cash target
@@ -465,7 +466,7 @@ function normSettings(s){
 let CFG = normSettings(null);
 
 // Deterministic financial-quality score (0-100) from the extracted numbers.
-// Intrinsic to the business (margin, growth, leverage, earnings quality) - independent of price.
+// Intrinsic to the business (margin, growth, leverage, earnings quality) — independent of price.
 function scoreFinancials(fin, s){
   if(!fin) return null;
   const E=Number(fin.ebitda)||0, R=Number(fin.revenue)||0;
@@ -582,7 +583,7 @@ function parseJSON(text){
 // Extract text from a PDF in the browser (the binary never leaves this device)
 async function extractPdfText(file, onProgress){
   const lib = window.pdfjsLib;
-  if(!lib) throw new Error("PDF reader didn't load - check your connection and reload.");
+  if(!lib) throw new Error("PDF reader didn't load — check your connection and reload.");
   lib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
   const buf = await file.arrayBuffer();
   const pdf = await lib.getDocument({data: buf}).promise;
@@ -634,23 +635,23 @@ Read the attached Confidential Information Memorandum and return ONLY a JSON obj
    "addbacks": [ {"label": string, "amount": number} ]  // EBITDA normalization add-backs, up to 5
  }
 }
-Be specific and honest - name the tradeoff. Do not inflate scores.
+Be specific and honest — name the tradeoff. Do not inflate scores.
 
-SCORING (critical - do this carefully):
+SCORING (critical — do this carefully):
 Rate each of the five dimensions on this anchored scale, and USE THE FULL RANGE:
-  90-100 = exceptional / rare - a genuine standout on this dimension
-  75-89  = strong - clearly above average
+  90-100 = exceptional / rare — a genuine standout on this dimension
+  75-89  = strong — clearly above average
   60-74  = solid / typical for a healthy small business
-  45-59  = mixed - real concerns balancing the positives
-  30-44  = weak - a material problem
+  45-59  = mixed — real concerns balancing the positives
+  30-44  = weak — a material problem
   0-29   = disqualifying on this dimension
-The five dimensions measure DIFFERENT things, so their scores should differ from each other - do NOT give the same number across dimensions.
+The five dimensions measure DIFFERENT things, so their scores should differ from each other — do NOT give the same number across dimensions.
   - financials: margin, growth, earnings quality, add-back risk, leverage
   - market: industry durability, demand, cyclicality, fragmentation
   - moat: switching costs, licensing, capability barriers, customer stickiness
   - management: depth below the owner, transition/key-person risk
   - fit: match to the firm mandate and hurdles stated above
-Most real deals land in the 50-70 range. Reserve 80+ for genuinely excellent attributes and use sub-45 when warranted. DO NOT default every score to ~75 - a flat, uniform score set is a failure. The financials score may be recomputed from the extracted numbers, so focus your judgment on making market, moat, management, and fit clearly differ from one another.`; }
+Most real deals land in the 50-70 range. Reserve 80+ for genuinely excellent attributes and use sub-45 when warranted. DO NOT default every score to ~75 — a flat, uniform score set is a failure. The financials score may be recomputed from the extracted numbers, so focus your judgment on making market, moat, management, and fit clearly differ from one another.`; }
 
 const DIGEST_PROMPT = `You are briefing the deals team. Read the attached CIM and write a dense ~230-word factual digest capturing: what the company does, financials (revenue, EBITDA, margins, growth), customers & concentration, operations/assets, management & transition, deal structure, and notable risks. Plain text, no headers, no preamble. This will ground later Q&A, so pack in the concrete facts and numbers.`;
 
@@ -672,11 +673,11 @@ function irr(cfs){
   }
   return r;
 }
-function fmtUSD(n){ if(n==null||isNaN(n)) return "-"; const a=Math.abs(n);
+function fmtUSD(n){ if(n==null||isNaN(n)) return "—"; const a=Math.abs(n);
   if(a>=1e6) return "$"+(n/1e6).toFixed(2)+"M";
   if(a>=1e3) return "$"+Math.round(n/1e3)+"K";
   return "$"+Math.round(n); }
-function fmtPct(n){ return (n==null||isNaN(n)||!isFinite(n))?"-":(n*100).toFixed(1)+"%"; }
+function fmtPct(n){ return (n==null||isNaN(n)||!isFinite(n))?"—":(n*100).toFixed(1)+"%"; }
 function cagr(a,b,yrs){ if(!a||!b||a<=0||b<=0) return null; return Math.pow(b/a,1/yrs)-1; }
 
 // Full deal model given base EBITDA + assumptions
@@ -796,7 +797,7 @@ function SetupScreen(){
           <li>Copy the Client ID and paste it into <code>index.html</code> at <code>GOOGLE_CLIENT_ID</code>.</li>
         </ol>
         <div className="kv">GOOGLE_CLIENT_ID = "1234…apps.googleusercontent.com"</div>
-        <p style={{marginTop:18,fontSize:12,color:"var(--muted-2)"}}>The AI service and cloud storage are set up separately on Cloudflare - see the README.</p>
+        <p style={{marginTop:18,fontSize:12,color:"var(--muted-2)"}}>The AI service and cloud storage are set up separately on Cloudflare — see the README.</p>
       </div>
     </div>
   );
@@ -893,7 +894,7 @@ function Rail({deals,activeId,onPick,onNew,open,loaded,user,onSignOut,onSettings
 
       <div className="secure">
         <div className="dot"></div>
-        <span>Private workspace - CIMs &amp; analysis stay on this deck. Not shared or published.</span>
+        <span>Private workspace — CIMs &amp; analysis stay on this deck. Not shared or published.</span>
       </div>
 
       <button className="newbtn" onClick={onNew}>
@@ -918,7 +919,7 @@ function Rail({deals,activeId,onPick,onNew,open,loaded,user,onSignOut,onSettings
             <span className={"rlight "+(d.status==="analyzing"?"pulse WATCH":d.verdict||"")}></span>
             <span style={{minWidth:0,flex:1}}>
               <div className="rname">{d.name||"Untitled CIM"}</div>
-              <div className="rmeta">{d.status==="analyzing"?"analyzing…":(d.verdict||"-")+" · "+(d.ebitda||"n/a")}</div>
+              <div className="rmeta">{d.status==="analyzing"?"analyzing…":(d.verdict||"—")+" · "+(d.ebitda||"n/a")}</div>
             </span>
             {d.status!=="analyzing" && <span className="rscore" style={{color:scoreColor(d.overall)}}>{d.overall??"–"}</span>}
           </button>
@@ -956,7 +957,7 @@ function Empty({onNew,loaded}){
         </svg>
         <div className="eyebrow" style={{marginBottom:14}}>Deal review · flight deck</div>
         <h2>Bring a CIM aboard.</h2>
-        <p>Upload a Confidential Information Memorandum and Deal Deck runs a first-pass read against the investment thesis - summary, pros and cons, ratings, a verdict, and next steps. Then refine the review and ask questions in a private chat grounded in the document.</p>
+        <p>Upload a Confidential Information Memorandum and Deal Deck runs a first-pass read against the investment thesis — summary, pros and cons, ratings, a verdict, and next steps. Then refine the review and ask questions in a private chat grounded in the document.</p>
         <button className="newbtn" style={{display:"inline-flex",width:"auto",margin:0,padding:"12px 22px"}} onClick={onNew}>
           <span style={{fontSize:16}}>＋</span> Upload your first CIM
         </button>
@@ -977,7 +978,7 @@ function DealView({deal,deals,tab,setTab,saveDeal,removeDeal,pdfCache,settings,o
           <select className="stagesel" value={deal.stage||"New"} style={{color:stageColor(deal.stage||"New"),borderColor:stageColor(deal.stage||"New")}}
             onChange={e=>saveDeal({...deal,stage:e.target.value})}>{STAGES.map(x=><option key={x} value={x}>{x}</option>)}</select>
           <div style={{flex:1}}></div>
-          <button className="ghost sm" onClick={()=>openMemo(deal)}>⭳ Export memo</button>
+          <button className="ghost sm" onClick={()=>downloadDealPDF(deal)}>⭳ Download PDF</button>
           <button className="ghost sm danger" onClick={()=>{ if(confirm("Remove this deal from the deck?")){ removeDeal(deal.id); onBack&&onBack(); } }}>Remove</button>
         </div>
         <DealHeader deal={deal} onDelete={()=>{ if(confirm("Remove this deal from the deck?")){ removeDeal(deal.id); onBack&&onBack(); } }}/>
@@ -1011,7 +1012,7 @@ function DealHeader({deal,onDelete}){
         <div className="h-one">{deal.oneLiner}</div>
         <div className="tel">
           {tel.map(([k,v])=>(
-            <div className="tcell" key={k}><div className="k">{k}</div><div className="v">{v||"-"}</div></div>
+            <div className="tcell" key={k}><div className="k">{k}</div><div className="v">{v||"—"}</div></div>
           ))}
         </div>
       </div>
@@ -1144,7 +1145,7 @@ function Review({deal,saveDeal}){
   return (
     <div>
       <div className="card">
-        <p className="lead" style={{marginTop:0}}>Everything here is yours to overwrite - the AI pass is a starting point, not the record. Your edits are what the deck keeps.</p>
+        <p className="lead" style={{marginTop:0}}>Everything here is yours to overwrite — the AI pass is a starting point, not the record. Your edits are what the deck keeps.</p>
         <div className="field"><label>Deal summary</label>
           <textarea rows="4" value={d.summary||""} onChange={e=>upd({summary:e.target.value})}/></div>
 
@@ -1158,7 +1159,7 @@ function Review({deal,saveDeal}){
 
       <div className="card" style={{marginTop:16}}>
         <h3>Reported figures <span className="tag ai">CONFIRM</span></h3>
-        <p className="lead" style={{marginTop:-6}}>Pulled from the CIM. Correct anything the AI misread - the <b>Financial quality</b> score and overall recompute from these instantly.</p>
+        <p className="lead" style={{marginTop:-6}}>Pulled from the CIM. Correct anything the AI misread — the <b>Financial quality</b> score and overall recompute from these instantly.</p>
         <div className="fingrid">
           {[["revenue","Revenue"],["ebitda","Adj. EBITDA"],["revPrior","Revenue (prior yr)"],["ebitdaPrior","EBITDA (prior yr)"],["netDebt","Net / LT debt"],["currentAssets","Current assets"],["currentLiab","Current liabilities"]].map(([k,label])=>(
             <div className="field" key={k} style={{marginBottom:0}}>
@@ -1195,7 +1196,7 @@ function Review({deal,saveDeal}){
       </div>
 
       <div className="card" style={{marginTop:16}}>
-        <div className="field" style={{marginBottom:20}}><label>Overall deal score - {d.overall??0}</label>
+        <div className="field" style={{marginBottom:20}}><label>Overall deal score — {d.overall??0}</label>
           <input type="range" min="0" max="100" value={d.overall??0} onChange={e=>upd({overall:+e.target.value})}/></div>
         <div className="field" style={{marginBottom:0}}><label>Final verdict</label>
           <div className="verdictpick">{VERDICTS.map(v=>(
@@ -1212,7 +1213,7 @@ function Review({deal,saveDeal}){
 
       <div className="card" style={{marginTop:16}}><h3>Analyst notes</h3>
         <div className="field" style={{marginBottom:0}}>
-          <textarea rows="4" placeholder="Your own read - anything the AI missed, gut checks, questions for the seller call…"
+          <textarea rows="4" placeholder="Your own read — anything the AI missed, gut checks, questions for the seller call…"
             value={d.analystNotes||""} onChange={e=>upd({analystNotes:e.target.value})}/></div>
       </div>
 
@@ -1270,7 +1271,7 @@ function Model({deal,saveDeal,settings}){
   const passCoC=m.coc1>=COC_TARGET, passDSCR=(!isFinite(m.dscr)||m.dscr>=DSCR_FLOOR), inBand=a.mult>=bandLo&&a.mult<=bandHi;
   const clears=passCoC&&passDSCR;
   const bandTxt=`${bandLo}–${bandHi}×`;
-  const readState = adjE<=0 ? "ENTER EBITDA TO MODEL" : clears ? (inBand?"CLEARS THE HURDLES":`WORKS - PRICED ABOVE ${bandTxt} BAND`) : "BELOW THE HURDLES";
+  const readState = adjE<=0 ? "ENTER EBITDA TO MODEL" : clears ? (inBand?"CLEARS THE HURDLES":`WORKS — PRICED ABOVE ${bandTxt} BAND`) : "BELOW THE HURDLES";
   const readColor = adjE<=0 ? "var(--muted)" : clears ? (inBand?"var(--go)":"var(--watch)") : "var(--pass)";
   const maxMult = adjE>0 ? maxEntryMultiple(adjE,a,COC_TARGET,DSCR_FLOOR) : null;
   const maxPriceUSD = maxMult!=null ? adjE*maxMult : null;
@@ -1313,7 +1314,7 @@ function Model({deal,saveDeal,settings}){
             : <div className="solver-val" style={{color:"var(--pass)"}}>No price clears both hurdles <span className="solver-x">at these assumptions</span></div>}
           <div className="solver-sub">
             {maxMult!=null
-              ? (a.mult<=maxMult+1e-9 ? "Your current price is within the disciplined range." : "Your current price is above this - you'd break a hurdle.")
+              ? (a.mult<=maxMult+1e-9 ? "Your current price is within the disciplined range." : "Your current price is above this — you'd break a hurdle.")
               : "Lower leverage or rate, or require faster growth, to open room."}
           </div>
         </div>
@@ -1349,7 +1350,7 @@ function Model({deal,saveDeal,settings}){
           <Sl label="Cash tax rate" val={a.tax} disp={(a.tax*100).toFixed(0)+"%"} min={0} max={0.4} step={0.01} onCh={v=>setAsm("tax",v)}/>
           <Sl label="Illustrative hold" val={a.hold} disp={a.hold+" yr"} min={3} max={10} step={1} onCh={v=>setAsm("hold",v)}/>
           <Sl label="Exit multiple" val={a.exit} disp={a.exit.toFixed(2)+"×"} min={2} max={8} step={0.25} onCh={v=>setAsm("exit",v)}/>
-          <p className="lead" style={{margin:"6px 0 0"}}>Autosaves. Permanent-hold basis - MOIC/IRR use the exit multiple only to sketch value, not as a sale plan.</p>
+          <p className="lead" style={{margin:"6px 0 0"}}>Autosaves. Permanent-hold basis — MOIC/IRR use the exit multiple only to sketch value, not as a sale plan.</p>
         </div>
 
         <div>
@@ -1379,18 +1380,18 @@ function Model({deal,saveDeal,settings}){
               <div className="ratings">
                 <div className="rrow"><div className="rl"><span className="name">Cumulative distributions ({a.hold}y)</span><span className="num">{fmtUSD(m.cumDist)}</span></div></div>
                 <div className="rrow"><div className="rl"><span className="name">Terminal equity @ {a.exit.toFixed(2)}×</span><span className="num">{fmtUSD(m.terminalEquity)}</span></div></div>
-                <div className="rrow"><div className="rl"><span className="name">MOIC</span><span className="num">{m.moic?m.moic.toFixed(2)+"×":"-"}</span></div></div>
+                <div className="rrow"><div className="rl"><span className="name">MOIC</span><span className="num">{m.moic?m.moic.toFixed(2)+"×":"—"}</span></div></div>
                 <div className="rrow"><div className="rl"><span className="name">IRR</span><span className="num" style={{color:cocText(m.irr)}}>{fmtPct(m.irr)}</span></div></div>
               </div>
             </div>
             <div className="card">
               <h3>Trend &amp; quality</h3>
               <div className="ratings">
-                <div className="rrow"><div className="rl"><span className="name">Revenue (latest)</span><span className="num">{fin.revenue?fmtUSD(fin.revenue):"-"}</span></div></div>
-                <div className="rrow"><div className="rl"><span className="name">Revenue YoY</span><span className="num" style={{color:revYoY!=null?cocText(revYoY+0.15):"inherit"}}>{revYoY!=null?fmtPct(revYoY):"-"}</span></div></div>
-                <div className="rrow"><div className="rl"><span className="name">EBITDA margin</span><span className="num">{margin!=null?fmtPct(margin):"-"}</span></div></div>
-                <div className="rrow"><div className="rl"><span className="name">EBITDA YoY</span><span className="num">{ebYoY!=null?fmtPct(ebYoY):"-"}</span></div></div>
-                <div className="rrow"><div className="rl"><span className="name">Current ratio</span><span className="num">{curRatio!=null?curRatio.toFixed(1)+"×":"-"}</span></div></div>
+                <div className="rrow"><div className="rl"><span className="name">Revenue (latest)</span><span className="num">{fin.revenue?fmtUSD(fin.revenue):"—"}</span></div></div>
+                <div className="rrow"><div className="rl"><span className="name">Revenue YoY</span><span className="num" style={{color:revYoY!=null?cocText(revYoY+0.15):"inherit"}}>{revYoY!=null?fmtPct(revYoY):"—"}</span></div></div>
+                <div className="rrow"><div className="rl"><span className="name">EBITDA margin</span><span className="num">{margin!=null?fmtPct(margin):"—"}</span></div></div>
+                <div className="rrow"><div className="rl"><span className="name">EBITDA YoY</span><span className="num">{ebYoY!=null?fmtPct(ebYoY):"—"}</span></div></div>
+                <div className="rrow"><div className="rl"><span className="name">Current ratio</span><span className="num">{curRatio!=null?curRatio.toFixed(1)+"×":"—"}</span></div></div>
               </div>
             </div>
           </div>
@@ -1440,7 +1441,7 @@ Ground every answer in the deal facts below; if something isn't covered, say it'
 === DEAL: ${deal.name} ===
 ${deal.digest||deal.summary}
 
-CURRENT VERDICT: ${deal.verdict} (${deal.overall}/100) - ${deal.verdictReason}
+CURRENT VERDICT: ${deal.verdict} (${deal.overall}/100) — ${deal.verdictReason}
 PROS: ${(deal.pros||[]).join("; ")}
 CONS: ${(deal.cons||[]).join("; ")}
 RISKS: ${(deal.risks||[]).join("; ")}`;
@@ -1468,7 +1469,7 @@ RISKS: ${(deal.risks||[]).join("; ")}`;
         {messages.length===0 && !busy &&
           <div>
             <div className="chatnote">
-              Ask anything about <strong style={{color:"var(--ink)"}}>{deal.name}</strong>. Answers are grounded in this CIM and the investment thesis - the conversation stays on this deck.
+              Ask anything about <strong style={{color:"var(--ink)"}}>{deal.name}</strong>. Answers are grounded in this CIM and the investment thesis — the conversation stays on this deck.
             </div>
             <div className="suggest">{suggestions.map(s=>
               <button key={s} className="chip" onClick={()=>send(s)}>{s}</button>)}</div>
@@ -1547,7 +1548,7 @@ function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,setRoute,pdfCach
       console.error(e);
       let base;
       if(e.message==="PDF_EMPTY")
-        base="Couldn't pull text from that PDF - it's likely scanned or image-only. Open it, copy the text, and paste it in the box below instead.";
+        base="Couldn't pull text from that PDF — it's likely scanned or image-only. Open it, copy the text, and paste it in the box below instead.";
       else{ base=friendlyError(e); if(base.startsWith("Something went wrong")) base="The analysis didn't come back cleanly. Try again, or paste the key text below."; }
       setErr(base);
       setPhase("error");
@@ -1579,7 +1580,7 @@ function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,setRoute,pdfCach
             <button className="x" onClick={()=>setFile(null)}>✕</button>
           </div>}
 
-          <div className="or">- OR PASTE TEXT -</div>
+          <div className="or">— OR PASTE TEXT —</div>
           <textarea placeholder="Paste the CIM text here if you don't have the PDF handy…"
             value={pasted} onChange={e=>setPasted(e.target.value)}/>
 
@@ -1610,7 +1611,7 @@ function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,setRoute,pdfCach
 }
 function clamp(n){ n=+n; if(isNaN(n)) return 0; return Math.max(0,Math.min(100,Math.round(n))); }
 // Headline score, computed from the sub-ratings (weighted to the firm's priorities) rather
-// than trusted from the model - which otherwise flattens everything to ~75.
+// than trusted from the model — which otherwise flattens everything to ~75.
 function overallFromRatings(r, weights){
   if(!r || typeof r!=="object") return null;
   const w = weights || CFG.weights;
@@ -1630,16 +1631,16 @@ function SettingsModal({settings,onSave,onClose}){
       <div className="modal settings-modal">
         <div className="eyebrow" style={{marginBottom:8}}>Company ideals</div>
         <h2>Settings</h2>
-        <p className="sub">These drive how the AI reads every CIM - the mandate it judges against, your hurdles, and how the score is weighted. Changes apply to new analyses and to the Model tab.</p>
+        <p className="sub">These drive how the AI reads every CIM — the mandate it judges against, your hurdles, and how the score is weighted. Changes apply to new analyses and to the Model tab.</p>
 
         <div className="field"><label>Investment thesis / mandate</label>
           <textarea rows="4" value={s.thesis} onChange={e=>set("thesis",e.target.value)}/></div>
 
         <div className="setgrid">
-          <div className="field"><label>EBITDA sweet spot - min ($M)</label><input type="number" step="0.5" value={s.ebitdaMin} onChange={e=>set("ebitdaMin",+e.target.value)}/></div>
-          <div className="field"><label>EBITDA sweet spot - max ($M)</label><input type="number" step="0.5" value={s.ebitdaMax} onChange={e=>set("ebitdaMax",+e.target.value)}/></div>
-          <div className="field"><label>Entry multiple - low (×)</label><input type="number" step="0.25" value={s.multLow} onChange={e=>set("multLow",+e.target.value)}/></div>
-          <div className="field"><label>Entry multiple - high (×)</label><input type="number" step="0.25" value={s.multHigh} onChange={e=>set("multHigh",+e.target.value)}/></div>
+          <div className="field"><label>EBITDA sweet spot — min ($M)</label><input type="number" step="0.5" value={s.ebitdaMin} onChange={e=>set("ebitdaMin",+e.target.value)}/></div>
+          <div className="field"><label>EBITDA sweet spot — max ($M)</label><input type="number" step="0.5" value={s.ebitdaMax} onChange={e=>set("ebitdaMax",+e.target.value)}/></div>
+          <div className="field"><label>Entry multiple — low (×)</label><input type="number" step="0.25" value={s.multLow} onChange={e=>set("multLow",+e.target.value)}/></div>
+          <div className="field"><label>Entry multiple — high (×)</label><input type="number" step="0.25" value={s.multHigh} onChange={e=>set("multHigh",+e.target.value)}/></div>
           <div className="field"><label>Target cash-on-cash (%)</label><input type="number" step="1" value={s.cocTarget} onChange={e=>set("cocTarget",+e.target.value)}/></div>
           <div className="field"><label>Minimum DSCR (×)</label><input type="number" step="0.05" value={s.dscrFloor} onChange={e=>set("dscrFloor",+e.target.value)}/></div>
         </div>
@@ -1649,7 +1650,7 @@ function SettingsModal({settings,onSave,onClose}){
         <div className="field"><label>Deal-breakers (optional)</label>
           <textarea rows="2" placeholder="e.g. heavy customer concentration, tech-obsolescence risk, leverage above 4×…" value={s.avoid} onChange={e=>set("avoid",e.target.value)}/></div>
 
-        <div className="field" style={{marginBottom:6}}><label>Overall-score weights - how much each dimension counts (now {wsum}%)</label></div>
+        <div className="field" style={{marginBottom:6}}><label>Overall-score weights — how much each dimension counts (now {wsum}%)</label></div>
         <div className="wgrid">
           {RATING_KEYS.map(([k,label])=>(
             <div className="wrow" key={k}>
@@ -1659,8 +1660,8 @@ function SettingsModal({settings,onSave,onClose}){
             </div>
           ))}
         </div>
-        {Math.abs(wsum-100)>0.5 && <div className="wnote">Weights total {wsum}% - they're normalized automatically, but 100% is tidiest.</div>}
-        <p className="lead" style={{margin:"10px 0 0"}}>Note: the <b>Financial quality</b> score is computed from the CIM's numbers (margin, growth, leverage), not guessed - so it's grounded regardless of weight.</p>
+        {Math.abs(wsum-100)>0.5 && <div className="wnote">Weights total {wsum}% — they're normalized automatically, but 100% is tidiest.</div>}
+        <p className="lead" style={{margin:"10px 0 0"}}>Note: the <b>Financial quality</b> score is computed from the CIM's numbers (margin, growth, leverage), not guessed — so it's grounded regardless of weight.</p>
 
         <div className="mfoot">
           <button className="ghost" onClick={()=>setS(normSettings(null))}>Reset to defaults</button>
@@ -1754,7 +1755,7 @@ function Compare({deals,onPick,onNew}){
     <div className="stage"><div className="wrap">
       <div className="eyebrow" style={{marginBottom:6}}>Compare</div>
       <h2 style={{fontFamily:"Space Grotesk",fontWeight:600,fontSize:24,margin:"0 0 6px",letterSpacing:"-.01em"}}>Side by side</h2>
-      <p className="lead" style={{marginTop:0}}>Pick up to four deals to line up - the best value in each row is marked ★.</p>
+      <p className="lead" style={{marginTop:0}}>Pick up to four deals to line up — the best value in each row is marked ★.</p>
 
       <div className="cmp-pick">
         {deals.map(d=>{ const on=sel.includes(d.id); return (
@@ -1777,7 +1778,7 @@ function Compare({deals,onPick,onNew}){
                 <tr key={ri}>
                   <td className="rowlab">{row.label}</td>
                   {picked.map((d,i)=>{ const v=row.get(d);
-                    const disp=(v==null||(typeof v==="number"&&isNaN(v)))?"-":row.fmt(v);
+                    const disp=(v==null||(typeof v==="number"&&isNaN(v)))?"—":row.fmt(v);
                     const col=(v!=null&&row.color)?row.color(v):"var(--ink)";
                     return <td key={d.id} className={"mono"+(i===bi?" best":"")} style={{color:col}}>{disp}{i===bi?<span className="star">★</span>:null}</td>;
                   })}
@@ -1796,7 +1797,7 @@ function BenchStrip({deal,deals}){
   const q=dealQuick(deal);
   const margin=deal.fin&&deal.fin.revenue?deal.fin.ebitda/deal.fin.revenue:null;
   const cell=(label,v,avg,fmt,better)=>{ const delta=(v!=null&&avg!=null)?v-avg:null;
-    return <div className="bcell"><div className="k">{label}</div><div className="v">{v!=null?fmt(v):"-"}</div>
+    return <div className="bcell"><div className="k">{label}</div><div className="v">{v!=null?fmt(v):"—"}</div>
       <div className="d" style={{color:delta==null?"var(--muted-2)":(better(delta)?"var(--go)":"var(--pass)")}}>{avg!=null?"pipeline "+fmt(avg):""}</div></div>; };
   return <div className="bench">
     <span className="eyebrow" style={{alignSelf:"center",whiteSpace:"nowrap"}}>vs pipeline · {others.length}</span>
@@ -1807,7 +1808,7 @@ function BenchStrip({deal,deals}){
 }
 
 function buildDiligencePrompt(deal, s){
-  return `You are a buy-side diligence lead for a permanent-hold acquirer. A CIM is written by the seller to sell - your job is to find what it does NOT say and what a buyer must independently verify.
+  return `You are a buy-side diligence lead for a permanent-hold acquirer. A CIM is written by the seller to sell — your job is to find what it does NOT say and what a buyer must independently verify.
 FIRM MANDATE: ${s.thesis}
 Return ONLY JSON:
 {
@@ -1886,7 +1887,7 @@ function Diligence({deal,saveDeal,settings}){
   if(!dg && !busy) return (
     <div className="card" style={{textAlign:"center",padding:"38px 24px"}}>
       <h3 style={{justifyContent:"center"}}>Diligence pack <span className="tag ai">AI</span></h3>
-      <p className="lead" style={{maxWidth:470,margin:"0 auto 20px"}}>A skeptical, buy-side read of what the CIM leaves out - red flags, missing information, a document-request list, and sharp questions for the seller call. Click any item to expand it into why it matters and how to investigate.</p>
+      <p className="lead" style={{maxWidth:470,margin:"0 auto 20px"}}>A skeptical, buy-side read of what the CIM leaves out — red flags, missing information, a document-request list, and sharp questions for the seller call. Click any item to expand it into why it matters and how to investigate.</p>
       <button className="savebtn" onClick={gen}>Generate diligence pack</button>
       {err && <div className="errbox" style={{marginTop:14,textAlign:"left"}}>{err}</div>}
     </div>);
@@ -1913,13 +1914,57 @@ function Diligence({deal,saveDeal,settings}){
   );
 }
 
+function downloadDealPDF(deal){
+  const Ctor = window.jspdf && window.jspdf.jsPDF;
+  if(!Ctor){ alert("PDF engine is still loading — give it a second and try again."); return; }
+  const doc = new Ctor({unit:"pt",format:"letter"});
+  const M=54, PW=doc.internal.pageSize.getWidth(), PH=doc.internal.pageSize.getHeight(), maxW=PW-M*2;
+  let y=M;
+  const ensure=(h)=>{ if(y+h>PH-M){ doc.addPage(); y=M; } };
+  const para=(str,{size=10,style="normal",color=[24,24,24],gap=1.45,indent=0}={})=>{
+    doc.setFont("helvetica",style); doc.setFontSize(size); doc.setTextColor(color[0],color[1],color[2]);
+    doc.splitTextToSize(String(str||""),maxW-indent).forEach(ln=>{ ensure(size*gap); doc.text(ln,M+indent,y); y+=size*gap; });
+  };
+  const heading=(str)=>{ y+=10; ensure(22); doc.setFont("helvetica","bold"); doc.setFontSize(11); doc.setTextColor(120,74,214);
+    doc.text(str.toUpperCase(),M,y); y+=5; doc.setDrawColor(124,77,255); doc.setLineWidth(1.4); doc.line(M,y,M+maxW,y); y+=13; };
+  const bullets=(arr,mark="•")=>{ (arr||[]).forEach((it,i)=>{ const m=(mark==="#")?(i+1)+".":mark;
+    doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(24,24,24);
+    doc.splitTextToSize(it,maxW-16).forEach((ln,j)=>{ ensure(14); doc.text(j===0?(m+"  "+ln):("    "+ln),M,y); y+=14; }); }); };
+
+  doc.setFont("helvetica","bold"); doc.setFontSize(20); doc.setTextColor(24,24,24); ensure(24); doc.text(deal.name||"Untitled",M,y); y+=22;
+  para((deal.oneLiner||"")+(deal.industry?"  ·  "+deal.industry:"")+(deal.location?"  ·  "+deal.location:""),{size:10,color:[110,100,140]});
+  const q=dealQuick(deal);
+  y+=4; para(`Overall ${deal.overall==null?"–":deal.overall}/100     Verdict ${deal.verdict||"—"}     Adj. EBITDA ${q.adjE?fmtUSD(q.adjE):(deal.ebitda||"—")}     Entry ${q.mult?q.mult.toFixed(2)+"x":"—"}     Cash-on-cash ${q.coc1!=null?Math.round(q.coc1*100)+"%":"—"}`,{size:9,style:"bold",color:[120,74,214]});
+
+  heading("Summary"); para(deal.summary||"");
+  heading("Recommendation"); para((deal.verdict||"—")+" — "+(deal.verdictReason||""));
+  heading("Pros"); bullets(deal.pros,"+");
+  heading("Cons"); bullets(deal.cons,"–");
+  heading("Risk flags"); bullets(deal.risks,"!");
+  heading("Recommended next steps"); bullets(deal.nextSteps,"#");
+  const dg=deal.diligence;
+  if(dg){
+    heading("Diligence — red flags"); bullets(dg.redFlags,"!");
+    heading("Missing from the CIM"); bullets(dg.missingInfo,"?");
+    heading("Document requests"); bullets(dg.requests,"#");
+    heading("Seller-call questions"); bullets(dg.questions,"#");
+  }
+  if(deal.analystNotes){ heading("Analyst notes"); para(deal.analystNotes); }
+
+  const pages=doc.internal.getNumberOfPages();
+  for(let i=1;i<=pages;i++){ doc.setPage(i); doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(150,150,160);
+    doc.text("Deal Deck · Confidential · "+new Date().toLocaleDateString(),M,PH-28);
+    doc.text(i+" / "+pages,PW-M,PH-28,{align:"right"}); }
+  doc.save((deal.name||"deal").replace(/[^\w]+/g,"_").replace(/^_+|_+$/g,"")+"_summary.pdf");
+}
+
 function esc(x){ return String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function openMemo(deal){
   const q=dealQuick(deal);
   const row=(k,v)=>v?`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`:"";
   const li=(arr)=>(arr||[]).map(x=>`<li>${esc(x)}</li>`).join("");
   const dg=deal.diligence;
-  const html=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(deal.name)} - Deal Memo</title><style>
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(deal.name)} — Deal Memo</title><style>
     *{box-sizing:border-box}body{font:13px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,sans-serif;color:#111;margin:40px;max-width:820px}
     h1{font-size:22px;margin:0 0 2px}.sub{color:#555;margin:0 0 16px}
     h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#0a7a55;border-bottom:2px solid #0a7a55;padding-bottom:4px;margin:22px 0 10px}
@@ -1934,21 +1979,21 @@ function openMemo(deal){
   <p class="sub">${esc(deal.oneLiner||"")}${deal.industry?" · "+esc(deal.industry):""}${deal.location?" · "+esc(deal.location):""}</p>
   <div class="tiles">
     <div class="tile"><div class="k">Overall</div><div class="v">${deal.overall==null?"–":deal.overall}/100</div></div>
-    <div class="tile"><div class="k">Verdict</div><div class="v">${esc(deal.verdict||"-")}</div></div>
-    <div class="tile"><div class="k">Adj. EBITDA</div><div class="v">${q.adjE?fmtUSD(q.adjE):esc(deal.ebitda||"-")}</div></div>
-    <div class="tile"><div class="k">Entry×</div><div class="v">${q.mult?q.mult.toFixed(2)+"×":"-"}</div></div>
-    <div class="tile"><div class="k">Cash-on-cash</div><div class="v">${q.coc1!=null?Math.round(q.coc1*100)+"%":"-"}</div></div>
-    <div class="tile"><div class="k">DSCR</div><div class="v">${q.dscr!=null&&isFinite(q.dscr)?q.dscr.toFixed(2)+"×":"-"}</div></div>
+    <div class="tile"><div class="k">Verdict</div><div class="v">${esc(deal.verdict||"—")}</div></div>
+    <div class="tile"><div class="k">Adj. EBITDA</div><div class="v">${q.adjE?fmtUSD(q.adjE):esc(deal.ebitda||"—")}</div></div>
+    <div class="tile"><div class="k">Entry×</div><div class="v">${q.mult?q.mult.toFixed(2)+"×":"—"}</div></div>
+    <div class="tile"><div class="k">Cash-on-cash</div><div class="v">${q.coc1!=null?Math.round(q.coc1*100)+"%":"—"}</div></div>
+    <div class="tile"><div class="k">DSCR</div><div class="v">${q.dscr!=null&&isFinite(q.dscr)?q.dscr.toFixed(2)+"×":"—"}</div></div>
   </div>
   <h2>Summary</h2><p>${esc(deal.summary||"")}</p>
-  <h2>Recommendation</h2><p><span class="verdict">${esc(deal.verdict||"-")}</span>&nbsp; ${esc(deal.verdictReason||"")}</p>
+  <h2>Recommendation</h2><p><span class="verdict">${esc(deal.verdict||"—")}</span>&nbsp; ${esc(deal.verdictReason||"")}</p>
   <h2>Key facts</h2><table>${row("Revenue",deal.revenue)}${row("Adj. EBITDA",deal.ebitda)}${row("Years in business",deal.years)}${row("Asking",deal.askNote)}${row("Stage",deal.stage)}</table>
   <div class="cols"><div><h2>Pros</h2><ul>${li(deal.pros)}</ul></div><div><h2>Cons</h2><ul>${li(deal.cons)}</ul></div></div>
   <h2>Risks</h2><ul>${li(deal.risks)}</ul>
   <h2>Recommended next steps</h2><ol>${li(deal.nextSteps)}</ol>
-  ${dg?`<h2>Diligence - red flags</h2><ul>${li(dg.redFlags)}</ul><h2>Missing from the CIM</h2><ul>${li(dg.missingInfo)}</ul><h2>Document requests</h2><ol>${li(dg.requests)}</ol><h2>Seller-call questions</h2><ol>${li(dg.questions)}</ol>`:""}
+  ${dg?`<h2>Diligence — red flags</h2><ul>${li(dg.redFlags)}</ul><h2>Missing from the CIM</h2><ul>${li(dg.missingInfo)}</ul><h2>Document requests</h2><ol>${li(dg.requests)}</ol><h2>Seller-call questions</h2><ol>${li(dg.questions)}</ol>`:""}
   ${deal.analystNotes?`<h2>Analyst notes</h2><p>${esc(deal.analystNotes)}</p>`:""}
-  <div class="foot">Deal Deck - generated ${new Date().toLocaleString()} · Confidential</div>
+  <div class="foot">Deal Deck — generated ${new Date().toLocaleString()} · Confidential</div>
   <scr`+`ipt>window.onload=function(){setTimeout(function(){window.print();},300);}</scr`+`ipt>
   </body></html>`;
   const w=window.open("","_blank");

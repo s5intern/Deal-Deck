@@ -395,6 +395,25 @@
   .cmp td.best{background:rgba(55,217,160,.08)}
   .cmp .star{color:var(--go);font-size:10px;margin-left:5px;vertical-align:top}
   .cmp-sec td{background:var(--deck);font-family:"JetBrains Mono";font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);text-align:left;padding:8px 14px}
+
+  /* diligence accordion */
+  .dili-list{list-style:none;margin:0;padding:0}
+  .dili-item{border-bottom:1px solid var(--line-soft)}
+  .dili-item:last-child{border-bottom:none}
+  .dili-head{width:100%;display:flex;align-items:flex-start;gap:11px;background:transparent;border:none;color:#dce4f0;padding:11px 0;text-align:left;font-size:13px;line-height:1.5}
+  .dili-head:hover{color:var(--ink)}
+  .dili-head:hover .chev{color:var(--signal)}
+  .dili-head .m{flex:0 0 auto;margin-top:1px;font-family:"JetBrains Mono";font-weight:700}
+  .dili-head .m.cons{color:var(--pass)} .dili-head .m.risks{color:var(--signal)} .dili-head .m.reqs{color:var(--cyan)}
+  .dili-txt{flex:1}
+  .chev{flex:0 0 auto;color:var(--muted-2);font-size:11px;margin-top:2px;transition:.15s}
+  .dili-item.open .chev{color:var(--signal)}
+  .dili-body{padding:2px 0 14px 34px;animation:diliIn .18s ease}
+  @keyframes diliIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+  .dili-exp{margin:0 0 10px;color:var(--muted);line-height:1.6;font-size:12.5px}
+  .dili-steps{counter-reset:s;list-style:none;margin:0;padding:0}
+  .dili-steps li{position:relative;padding:7px 0 7px 30px;line-height:1.5;color:#d6deec;font-size:12.5px;border-top:1px solid var(--line-soft)}
+  .dili-steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:7px;font-family:"JetBrains Mono";font-size:10px;font-weight:700;color:var(--signal);border:1px solid var(--signal-dim);border-radius:5px;padding:1px 6px}
 </style>
 
 </head>
@@ -1805,6 +1824,53 @@ Known cons: ${(deal.cons||[]).join("; ")}
 Known risks: ${(deal.risks||[]).join("; ")}`;
 }
 
+function explainDiliItem(deal, category, item){
+  const prompt = `You are a buy-side diligence lead for a permanent-hold acquirer. Expand on ONE ${category} for the deal below.
+ITEM: "${item}"
+Return ONLY JSON: {"explanation": string (2-3 sentences: why this matters to a buyer and what's really at stake), "steps": [string] (2-4 concrete actions to investigate, verify, or mitigate it; each <=16 words)}. No preamble, no markdown.
+
+=== DEAL: ${deal.name} ===
+${deal.digest||deal.summary}`;
+  return callClaude(prompt,{max_tokens:700}).then(parseJSON);
+}
+
+function DiliItem({deal,saveDeal,category,item,marker,mcls}){
+  const [open,setOpen]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const [err,setErr]=useState("");
+  const key=category+"|"+item;
+  const detail=(deal.diligence&&deal.diligence.details&&deal.diligence.details[key])||null;
+  const toggle=async()=>{
+    const willOpen=!open; setOpen(willOpen);
+    if(willOpen && !detail && !busy){
+      setBusy(true); setErr("");
+      try{
+        const d=await explainDiliItem(deal,category,item);
+        const details={...((deal.diligence&&deal.diligence.details)||{}), [key]:{explanation:d.explanation||"",steps:d.steps||[]}};
+        await saveDeal({...deal, diligence:{...deal.diligence, details}});
+      }catch(e){ setErr(friendlyError(e)); }
+      finally{ setBusy(false); }
+    }
+  };
+  return (
+    <li className={"dili-item"+(open?" open":"")}>
+      <button className="dili-head" onClick={toggle}>
+        <span className={"m "+mcls}>{marker}</span>
+        <span className="dili-txt">{item}</span>
+        <span className="chev">{open?"▾":"▸"}</span>
+      </button>
+      {open && <div className="dili-body">
+        {busy && !detail && <div className="dots" style={{padding:"2px 0 8px"}}><span></span><span></span><span></span></div>}
+        {err && <div className="errbox" style={{margin:"0 0 6px"}}>{err}</div>}
+        {detail && <>
+          <p className="dili-exp">{detail.explanation}</p>
+          {detail.steps&&detail.steps.length>0 && <ol className="dili-steps">{detail.steps.map((s,i)=><li key={i}>{s}</li>)}</ol>}
+        </>}
+      </div>}
+    </li>
+  );
+}
+
 function Diligence({deal,saveDeal,settings}){
   const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
   const dg=deal.diligence;
@@ -1813,35 +1879,36 @@ function Diligence({deal,saveDeal,settings}){
     try{
       const raw=await callClaude(buildDiligencePrompt(deal,settings),{max_tokens:1500});
       const j=parseJSON(raw);
-      await saveDeal({...deal, diligence:{redFlags:j.redFlags||[],missingInfo:j.missingInfo||[],requests:j.requests||[],questions:j.questions||[],generatedAt:Date.now()}});
+      await saveDeal({...deal, diligence:{redFlags:j.redFlags||[],missingInfo:j.missingInfo||[],requests:j.requests||[],questions:j.questions||[],details:{},generatedAt:Date.now()}});
     }catch(e){ setErr(friendlyError(e)); }
     finally{ setBusy(false); }
   };
   if(!dg && !busy) return (
     <div className="card" style={{textAlign:"center",padding:"38px 24px"}}>
       <h3 style={{justifyContent:"center"}}>Diligence pack <span className="tag ai">AI</span></h3>
-      <p className="lead" style={{maxWidth:470,margin:"0 auto 20px"}}>A skeptical, buy-side read of what the CIM leaves out — red flags, missing information, a document-request list, and sharp questions for the seller call.</p>
+      <p className="lead" style={{maxWidth:470,margin:"0 auto 20px"}}>A skeptical, buy-side read of what the CIM leaves out — red flags, missing information, a document-request list, and sharp questions for the seller call. Click any item to expand it into why it matters and how to investigate.</p>
       <button className="savebtn" onClick={gen}>Generate diligence pack</button>
       {err && <div className="errbox" style={{marginTop:14,textAlign:"left"}}>{err}</div>}
     </div>);
   if(busy && !dg) return <div className="card"><div className="analyzing" style={{padding:30}}><div className="dots"><span></span><span></span><span></span></div><div className="scan">Reading between the lines…</div></div></div>;
-  const mark=(mcls)=>mcls==="cons"?"!":mcls==="risks"?"?":"›";
-  const List=({title,items,tag,tagcls,mcls})=>(
+  const List=({title,items,tag,tagcls,category,marker,mcls})=>(
     <div className="card"><h3>{title} <span className={"tag "+tagcls}>{tag}</span></h3>
-      <ul className={"pc "+mcls}>{(items||[]).map((x,i)=><li key={i}><span className="m">{mark(mcls)}</span>{x}</li>)}</ul></div>);
+      <ul className="dili-list">{(items||[]).map((x,i)=><DiliItem key={category+i} deal={deal} saveDeal={saveDeal} category={category} item={x} marker={marker} mcls={mcls}/>)}</ul></div>);
   return (
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,gap:12}}>
-        <p className="lead" style={{margin:0}}>Generated {dg?new Date(dg.generatedAt).toLocaleDateString():""} · a buy-side read of the CIM's gaps.</p>
+        <p className="lead" style={{margin:0}}>Generated {dg?new Date(dg.generatedAt).toLocaleDateString():""} · click any item to expand it.</p>
         <button className="ghost" onClick={gen} disabled={busy} style={{whiteSpace:"nowrap"}}>{busy?"Regenerating…":"Regenerate"}</button>
       </div>
       {err && <div className="errbox" style={{marginBottom:14}}>{err}</div>}
       <div className="grid2" style={{marginBottom:16}}>
-        <List title="Red flags" items={dg.redFlags} tag="CONCERNS" tagcls="pass" mcls="cons"/>
-        <List title="Missing from the CIM" items={dg.missingInfo} tag="GAPS" tagcls="risk" mcls="risks"/>
+        <List title="Red flags" items={dg.redFlags} tag="CONCERNS" tagcls="pass" category="red flag" marker="!" mcls="cons"/>
+        <List title="Missing from the CIM" items={dg.missingInfo} tag="GAPS" tagcls="risk" category="missing information" marker="?" mcls="risks"/>
       </div>
-      <div className="card" style={{marginBottom:16}}><h3>Document requests</h3><ol className="steps">{(dg.requests||[]).map((x,i)=><li key={i}>{x}</li>)}</ol></div>
-      <div className="card"><h3>Questions for the seller call</h3><ol className="steps">{(dg.questions||[]).map((x,i)=><li key={i}>{x}</li>)}</ol></div>
+      <div className="card" style={{marginBottom:16}}><h3>Document requests</h3>
+        <ul className="dili-list">{(dg.requests||[]).map((x,i)=><DiliItem key={"req"+i} deal={deal} saveDeal={saveDeal} category="document request" item={x} marker="›" mcls="reqs"/>)}</ul></div>
+      <div className="card"><h3>Questions for the seller call</h3>
+        <ul className="dili-list">{(dg.questions||[]).map((x,i)=><DiliItem key={"q"+i} deal={deal} saveDeal={saveDeal} category="seller-call question" item={x} marker="›" mcls="reqs"/>)}</ul></div>
     </div>
   );
 }

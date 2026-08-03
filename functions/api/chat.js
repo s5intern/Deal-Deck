@@ -43,7 +43,9 @@ export async function onRequestPost(context) {
       return json({ error: "Workers AI error: " + String(e) }, 502);
     }
 
-    const text = (result && (result.response ?? result.text)) || "";
+    let text = result && (result.response != null ? result.response : result.text);
+    if (text != null && typeof text !== "string") text = JSON.stringify(text);
+    text = text || "";
     if (!text) return json({ error: "Model returned no text" }, 502);
 
     return json({ content: [{ type: "text", text }] });

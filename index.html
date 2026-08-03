@@ -4,6 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Deal Deck</title>
+<link rel="icon" type="image/x-icon" href="dd.ico" />
+<link rel="icon" type="image/png" href="dd.png" />
+<link rel="apple-touch-icon" href="dd.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -16,22 +19,22 @@
 
 <style>
   :root{
-    --void:#080d16;
-    --deck:#0d1522;
-    --panel:#131e30;
-    --panel-2:#18263c;
-    --line:#26364f;
-    --line-soft:#1c2a41;
-    --ink:#eef3fb;
-    --muted:#8496b3;
-    --muted-2:#5f708c;
-    --signal:#ffb02e;      /* telemetry amber */
-    --signal-dim:#7a5a1c;
-    --go:#37d9a0;          /* PURSUE */
-    --watch:#ffb02e;       /* WATCH */
-    --pass:#ff5d6c;        /* PASS */
-    --cyan:#5ab0ff;        /* AI / chat */
-    --grid: rgba(90,176,255,.05);
+    --void:#0b0916;        /* deep violet-black */
+    --deck:#130f22;
+    --panel:#1a1430;
+    --panel-2:#241b40;
+    --line:#352a5c;        /* purple hairline */
+    --line-soft:#251d42;
+    --ink:#f2edff;         /* lavender white */
+    --muted:#9a8fc0;
+    --muted-2:#6f6499;
+    --signal:#ffd23f;      /* golden yellow */
+    --signal-dim:#8a6a12;
+    --go:#3ddc9a;          /* PURSUE (kept green for meaning) */
+    --watch:#ffd23f;       /* WATCH */
+    --pass:#ff5d78;        /* PASS */
+    --cyan:#a970ff;        /* AI / chat / secondary — now violet */
+    --grid: rgba(169,112,255,.06);
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
@@ -57,7 +60,7 @@
   .rail{background:linear-gradient(180deg,var(--deck),#0a111c);border-right:1px solid var(--line-soft);display:flex;flex-direction:column;min-height:0}
   .main{position:relative;min-width:0;overflow:hidden;display:flex;flex-direction:column;
     background:
-      radial-gradient(1200px 600px at 78% -8%, rgba(90,176,255,.06), transparent 60%),
+      radial-gradient(1200px 600px at 78% -8%, rgba(169,112,255,.06), transparent 60%),
       linear-gradient(180deg,#0b111d,#080d16);
   }
   .main::before{content:"";position:absolute;inset:0;pointer-events:none;
@@ -66,8 +69,9 @@
 
   /* brand */
   .brand{padding:18px 18px 14px;border-bottom:1px solid var(--line-soft);display:flex;gap:12px;align-items:center}
-  .logo{width:38px;height:38px;flex:0 0 auto;border-radius:9px;background:radial-gradient(circle at 50% 35%,#1b2c46,#0c1421);border:1px solid var(--line);display:grid;place-items:center;position:relative;overflow:hidden}
+  .logo{width:40px;height:40px;flex:0 0 auto;display:grid;place-items:center;position:relative}
   .logo svg{width:24px;height:24px}
+  .logo-img{width:100%;height:100%;object-fit:contain;display:block}
   .brand h1{font-family:"Space Grotesk";font-size:15px;font-weight:600;margin:0;letter-spacing:.02em}
   .brand .sub{font-family:"JetBrains Mono";font-size:9.5px;letter-spacing:.24em;color:var(--muted-2);text-transform:uppercase;margin-top:2px}
 
@@ -76,9 +80,9 @@
   .secure span{font-family:"JetBrains Mono";font-size:10px;letter-spacing:.06em;color:#9fe6cb;line-height:1.35}
 
   .newbtn{margin:12px 14px;padding:11px 14px;border-radius:9px;border:1px solid var(--signal-dim);
-    background:linear-gradient(180deg,rgba(255,176,46,.16),rgba(255,176,46,.06));color:var(--signal);
+    background:linear-gradient(180deg,rgba(255,210,63,.16),rgba(255,210,63,.06));color:var(--signal);
     font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;gap:8px;transition:.15s}
-  .newbtn:hover{background:rgba(255,176,46,.2);box-shadow:0 0 0 1px var(--signal-dim)}
+  .newbtn:hover{background:rgba(255,210,63,.2);box-shadow:0 0 0 1px var(--signal-dim)}
 
   .rosterhead{padding:6px 18px;display:flex;justify-content:space-between;align-items:center}
   .roster{overflow-y:auto;flex:1;padding:2px 10px 14px;min-height:0}
@@ -179,7 +183,7 @@
   .verdictpick{display:flex;gap:8px}
   .vp{flex:1;padding:12px;border-radius:10px;border:1px solid var(--line-soft);background:var(--deck);color:var(--muted);font-weight:600;font-family:"JetBrains Mono";font-size:12px;letter-spacing:.08em;transition:.15s}
   .vp.PURSUE.sel{color:var(--go);border-color:var(--go);background:rgba(55,217,160,.08)}
-  .vp.WATCH.sel{color:var(--watch);border-color:var(--watch);background:rgba(255,176,46,.08)}
+  .vp.WATCH.sel{color:var(--watch);border-color:var(--watch);background:rgba(255,210,63,.08)}
   .vp.PASS.sel{color:var(--pass);border-color:var(--pass);background:rgba(255,93,108,.08)}
   .savebar{position:sticky;bottom:0;margin-top:6px;padding:14px 0;display:flex;gap:12px;align-items:center;background:linear-gradient(0deg,var(--void) 60%,transparent)}
   .savebtn{padding:11px 22px;border-radius:9px;border:1px solid var(--go);background:rgba(55,217,160,.14);color:var(--go);font-weight:600;font-size:13px}
@@ -193,10 +197,10 @@
   .msg{display:flex;gap:12px;margin-bottom:18px;max-width:88%}
   .msg .av{width:28px;height:28px;flex:0 0 auto;border-radius:8px;display:grid;place-items:center;font-family:"JetBrains Mono";font-size:10px;font-weight:700}
   .msg.user{margin-left:auto;flex-direction:row-reverse}
-  .msg.user .av{background:rgba(255,176,46,.14);color:var(--signal);border:1px solid var(--signal-dim)}
-  .msg.ai .av{background:rgba(90,176,255,.12);color:var(--cyan);border:1px solid #2c5a8a}
+  .msg.user .av{background:rgba(255,210,63,.14);color:var(--signal);border:1px solid var(--signal-dim)}
+  .msg.ai .av{background:rgba(169,112,255,.12);color:var(--cyan);border:1px solid #5a3a8a}
   .bubble{padding:12px 15px;border-radius:12px;line-height:1.65;font-size:13.5px;white-space:pre-wrap}
-  .msg.user .bubble{background:rgba(255,176,46,.1);border:1px solid var(--signal-dim)}
+  .msg.user .bubble{background:rgba(255,210,63,.1);border:1px solid var(--signal-dim)}
   .msg.ai .bubble{background:var(--deck);border:1px solid var(--line-soft);color:#dce4f0}
   .chatbar{border-top:1px solid var(--line-soft);padding:14px;display:flex;gap:10px;background:var(--deck)}
   .chatbar textarea{flex:1;background:var(--panel);border:1px solid var(--line-soft);border-radius:10px;color:var(--ink);padding:11px 13px;font-size:13.5px;resize:none;line-height:1.5;max-height:120px}
@@ -215,8 +219,8 @@
   .modal{width:min(560px,100%);background:linear-gradient(180deg,var(--panel),var(--deck));border:1px solid var(--line);border-radius:16px;padding:26px;position:relative}
   .modal h2{font-family:"Space Grotesk";font-size:19px;margin:0 0 4px;font-weight:600}
   .modal p.sub{color:var(--muted);font-size:12.5px;margin:0 0 20px}
-  .drop{border:1.5px dashed var(--line);border-radius:12px;padding:34px 20px;text-align:center;transition:.15s;cursor:pointer;background:rgba(90,176,255,.03)}
-  .drop.over{border-color:var(--cyan);background:rgba(90,176,255,.08)}
+  .drop{border:1.5px dashed var(--line);border-radius:12px;padding:34px 20px;text-align:center;transition:.15s;cursor:pointer;background:rgba(169,112,255,.03)}
+  .drop.over{border-color:var(--cyan);background:rgba(169,112,255,.08)}
   .drop .ic{font-size:30px;margin-bottom:10px}
   .drop strong{color:var(--cyan)}
   .drop small{display:block;color:var(--muted-2);margin-top:8px;font-family:"JetBrains Mono";font-size:10px;letter-spacing:.06em}
@@ -253,13 +257,13 @@
 
   /* auth + setup */
   .authwrap{height:100vh;display:grid;place-items:center;padding:24px;position:relative;
-    background:radial-gradient(1000px 700px at 50% -10%, rgba(90,176,255,.08), transparent 60%),linear-gradient(180deg,#0b111d,#080d16)}
+    background:radial-gradient(1000px 700px at 50% -10%, rgba(169,112,255,.08), transparent 60%),linear-gradient(180deg,#0b111d,#080d16)}
   .authwrap::before{content:"";position:absolute;inset:0;pointer-events:none;
     background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
     background-size:44px 44px;mask-image:radial-gradient(600px 400px at 50% 40%,rgba(0,0,0,.6),transparent 75%)}
   .authcard{position:relative;z-index:1;width:min(440px,100%);text-align:center;
     background:linear-gradient(180deg,var(--panel),var(--deck));border:1px solid var(--line);border-radius:18px;padding:38px 34px}
-  .authcard .logo{width:56px;height:56px;margin:0 auto 20px}
+  .authcard .logo{width:64px;height:64px;margin:0 auto 20px}
   .authcard .logo svg{width:34px;height:34px}
   .authcard h1{font-family:"Space Grotesk";font-size:24px;font-weight:600;margin:0 0 6px;letter-spacing:-.01em}
   .authcard p{color:var(--muted);line-height:1.6;margin:0 0 26px;font-size:13.5px}
@@ -311,16 +315,16 @@
     border:1px solid;border-radius:6px;padding:4px 9px;white-space:nowrap}
   .s5read-txt{font-size:13.5px;line-height:1.55;color:#d6deec}
   .solver{display:flex;align-items:center;gap:16px;justify-content:space-between;flex-wrap:wrap;
-    background:radial-gradient(600px 200px at 100% 0,rgba(255,176,46,.09),transparent 70%),var(--panel);
+    background:radial-gradient(600px 200px at 100% 0,rgba(255,210,63,.09),transparent 70%),var(--panel);
     border:1px solid var(--signal-dim);border-radius:12px;padding:16px 20px;margin-bottom:16px}
   .solver .k{font-family:"JetBrains Mono";font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted-2)}
   .solver .q{cursor:help;color:var(--muted-2)}
   .solver-val{font-family:"JetBrains Mono";font-size:26px;font-weight:700;color:var(--signal);margin-top:4px;line-height:1.1}
   .solver-x{font-size:13px;color:var(--muted);font-weight:500}
   .solver-sub{font-size:12px;color:var(--muted);margin-top:5px}
-  .solver-btn{background:linear-gradient(180deg,rgba(255,176,46,.16),rgba(255,176,46,.06));border:1px solid var(--signal-dim);
+  .solver-btn{background:linear-gradient(180deg,rgba(255,210,63,.16),rgba(255,210,63,.06));border:1px solid var(--signal-dim);
     color:var(--signal);border-radius:9px;padding:11px 16px;font-weight:600;font-size:13px;white-space:nowrap;flex:0 0 auto}
-  .solver-btn:hover{background:rgba(255,176,46,.24)}
+  .solver-btn:hover{background:rgba(255,210,63,.24)}
 
   /* settings */
   .gear{margin-left:auto;background:transparent;border:1px solid var(--line-soft);border-radius:8px;color:var(--muted);width:32px;height:32px;flex:0 0 auto;display:grid;place-items:center;font-size:15px;line-height:1}
@@ -376,7 +380,7 @@
   .cmp-pick{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
   .cmp-chip{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line-soft);border-radius:999px;padding:8px 14px;color:var(--muted);font-size:12.5px;font-weight:600}
   .cmp-chip:hover{color:var(--ink);border-color:var(--line)}
-  .cmp-chip.on{color:var(--ink);border-color:var(--signal-dim);background:rgba(255,176,46,.06)}
+  .cmp-chip.on{color:var(--ink);border-color:var(--signal-dim);background:rgba(255,210,63,.06)}
   .cmp-chip .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
   .cmp-wrap{border:1px solid var(--line-soft);border-radius:12px;overflow-x:auto;background:var(--panel)}
   .cmp{width:100%;border-collapse:collapse;font-size:13px}
@@ -401,13 +405,13 @@
 const {useState,useEffect,useRef,useCallback} = React;
 
 /* ============================================================
-   CONFIG  - edit these three, then deploy.
+   CONFIG  — edit these three, then deploy.
    ============================================================ */
 // 1) Paste your Google OAuth Client ID (ends in .apps.googleusercontent.com)
 const GOOGLE_CLIENT_ID = "164987131312-adksaras673lf5q3m7l1emtmq1q1snsa.apps.googleusercontent.com";
 // 2) A model available on YOUR Anthropic account (see docs.claude.com models page)
 const MODEL = "claude-sonnet-4-5";
-// 3) false = this browser only (works instantly). true = Cloudflare KV cross-device (needs setup - see README).
+// 3) false = this browser only (works instantly). true = Cloudflare KV cross-device (needs setup — see README).
 const CLOUD_STORAGE = false;
 // 4) true = one SHARED team pipeline (everyone signed in sees the same deals). Needs CLOUD_STORAGE=true + KV.
 const SHARED_MODE = false;
@@ -423,7 +427,7 @@ const RATING_KEYS = [
 
 /* ---------- editable "company ideals" (Settings) ---------- */
 const DEFAULT_SETTINGS = {
-  thesis: "A permanent-hold investment firm that buys controlling interests in durable, cash-flow-generating small businesses - typically blue-collar / \"moves atoms\" (trades, manufacturing, service). No fund clock: returns come from ongoing distributions, not a future sale.",
+  thesis: "A permanent-hold investment firm that buys controlling interests in durable, cash-flow-generating small businesses — typically blue-collar / \"moves atoms\" (trades, manufacturing, service). No fund clock: returns come from ongoing distributions, not a future sale.",
   ebitdaMin: 2, ebitdaMax: 10,      // $M sweet spot
   multLow: 4, multHigh: 6,          // entry multiple band (x)
   cocTarget: 25,                    // % cash-on-cash target
@@ -442,7 +446,7 @@ function normSettings(s){
 let CFG = normSettings(null);
 
 // Deterministic financial-quality score (0-100) from the extracted numbers.
-// Intrinsic to the business (margin, growth, leverage, earnings quality) - independent of price.
+// Intrinsic to the business (margin, growth, leverage, earnings quality) — independent of price.
 function scoreFinancials(fin, s){
   if(!fin) return null;
   const E=Number(fin.ebitda)||0, R=Number(fin.revenue)||0;
@@ -537,7 +541,7 @@ async function callClaude(messages, {system, pdf, max_tokens=1500, retries=3}={}
     if(res.status===429) throw new Error("RATE_LIMIT");
     if(!res.ok){ const t=await res.text().catch(()=>""); throw new Error("API "+res.status+" "+t.slice(0,160)); }
     const data = await res.json();
-    return (data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n").trim();
+    return (data.content||[]).filter(b=>b.type==="text").map(b=>typeof b.text==="string"?b.text:JSON.stringify(b.text)).join("\n").trim();
   }
 }
 function friendlyError(e){
@@ -548,32 +552,18 @@ function friendlyError(e){
   if(m==="NETWORK") return "Couldn't reach the server. Check your connection and try again.";
   return "Something went wrong: "+m;
 }
-function parseJSON(input) {
-  // 1. If it's already an object, return it immediately
-  if (typeof input === "object" && input !== null) {
-    return input;
-  }
-
-  // 2. Safely convert to string and strip Markdown code fences
-  let t = String(input || "")
-    .replace(/```json/gi, "")
-    .replace(/```/g, "")
-    .trim();
-
-  // 3. Extract the JSON block if wrapped in conversational text
-  const a = t.indexOf("{");
-  const b = t.lastIndexOf("}");
-  if (a >= 0 && b > a) {
-    t = t.slice(a, b + 1);
-  }
-
+function parseJSON(text){
+  if(text && typeof text==="object") return text;   // runtime already parsed it
+  let t = String(text).replace(/```json/gi,"").replace(/```/g,"").trim();
+  const a=t.indexOf("{"), b=t.lastIndexOf("}");
+  if(a>=0 && b>a) t=t.slice(a,b+1);
   return JSON.parse(t);
 }
 
 // Extract text from a PDF in the browser (the binary never leaves this device)
 async function extractPdfText(file, onProgress){
   const lib = window.pdfjsLib;
-  if(!lib) throw new Error("PDF reader didn't load - check your connection and reload.");
+  if(!lib) throw new Error("PDF reader didn't load — check your connection and reload.");
   lib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
   const buf = await file.arrayBuffer();
   const pdf = await lib.getDocument({data: buf}).promise;
@@ -625,23 +615,23 @@ Read the attached Confidential Information Memorandum and return ONLY a JSON obj
    "addbacks": [ {"label": string, "amount": number} ]  // EBITDA normalization add-backs, up to 5
  }
 }
-Be specific and honest - name the tradeoff. Do not inflate scores.
+Be specific and honest — name the tradeoff. Do not inflate scores.
 
-SCORING (critical - do this carefully):
+SCORING (critical — do this carefully):
 Rate each of the five dimensions on this anchored scale, and USE THE FULL RANGE:
-  90-100 = exceptional / rare - a genuine standout on this dimension
-  75-89  = strong - clearly above average
+  90-100 = exceptional / rare — a genuine standout on this dimension
+  75-89  = strong — clearly above average
   60-74  = solid / typical for a healthy small business
-  45-59  = mixed - real concerns balancing the positives
-  30-44  = weak - a material problem
+  45-59  = mixed — real concerns balancing the positives
+  30-44  = weak — a material problem
   0-29   = disqualifying on this dimension
-The five dimensions measure DIFFERENT things, so their scores should differ from each other - do NOT give the same number across dimensions.
+The five dimensions measure DIFFERENT things, so their scores should differ from each other — do NOT give the same number across dimensions.
   - financials: margin, growth, earnings quality, add-back risk, leverage
   - market: industry durability, demand, cyclicality, fragmentation
   - moat: switching costs, licensing, capability barriers, customer stickiness
   - management: depth below the owner, transition/key-person risk
   - fit: match to the firm mandate and hurdles stated above
-Most real deals land in the 50-70 range. Reserve 80+ for genuinely excellent attributes and use sub-45 when warranted. DO NOT default every score to ~75 - a flat, uniform score set is a failure. The financials score may be recomputed from the extracted numbers, so focus your judgment on making market, moat, management, and fit clearly differ from one another.`; }
+Most real deals land in the 50-70 range. Reserve 80+ for genuinely excellent attributes and use sub-45 when warranted. DO NOT default every score to ~75 — a flat, uniform score set is a failure. The financials score may be recomputed from the extracted numbers, so focus your judgment on making market, moat, management, and fit clearly differ from one another.`; }
 
 const DIGEST_PROMPT = `You are briefing the deals team. Read the attached CIM and write a dense ~230-word factual digest capturing: what the company does, financials (revenue, EBITDA, margins, growth), customers & concentration, operations/assets, management & transition, deal structure, and notable risks. Plain text, no headers, no preamble. This will ground later Q&A, so pack in the concrete facts and numbers.`;
 
@@ -663,11 +653,11 @@ function irr(cfs){
   }
   return r;
 }
-function fmtUSD(n){ if(n==null||isNaN(n)) return "-"; const a=Math.abs(n);
+function fmtUSD(n){ if(n==null||isNaN(n)) return "—"; const a=Math.abs(n);
   if(a>=1e6) return "$"+(n/1e6).toFixed(2)+"M";
   if(a>=1e3) return "$"+Math.round(n/1e3)+"K";
   return "$"+Math.round(n); }
-function fmtPct(n){ return (n==null||isNaN(n)||!isFinite(n))?"-":(n*100).toFixed(1)+"%"; }
+function fmtPct(n){ return (n==null||isNaN(n)||!isFinite(n))?"—":(n*100).toFixed(1)+"%"; }
 function cagr(a,b,yrs){ if(!a||!b||a<=0||b<=0) return null; return Math.pow(b/a,1/yrs)-1; }
 
 // Full deal model given base EBITDA + assumptions
@@ -763,11 +753,7 @@ function AuthScreen({ready,onCredential}){
     <div className="authwrap">
       <div className="authcard">
         <div className="logo">
-          <svg viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="6.5" stroke="#5ab0ff" strokeWidth="1.4"/>
-            <ellipse cx="12" cy="12" rx="11" ry="4.2" stroke="#ffb02e" strokeWidth="1.3" transform="rotate(-24 12 12)"/>
-            <circle cx="12" cy="12" r="2.1" fill="#ffb02e"/>
-          </svg>
+          <img src="dd.png" alt="Deal Deck" className="logo-img"/>
         </div>
         <h1>Deal Deck</h1>
         <p>A private deal-review station. Sign in to open your pipeline.</p>
@@ -791,7 +777,7 @@ function SetupScreen(){
           <li>Copy the Client ID and paste it into <code>index.html</code> at <code>GOOGLE_CLIENT_ID</code>.</li>
         </ol>
         <div className="kv">GOOGLE_CLIENT_ID = "1234…apps.googleusercontent.com"</div>
-        <p style={{marginTop:18,fontSize:12,color:"var(--muted-2)"}}>The AI service and cloud storage are set up separately on Cloudflare - see the README.</p>
+        <p style={{marginTop:18,fontSize:12,color:"var(--muted-2)"}}>The AI service and cloud storage are set up separately on Cloudflare — see the README.</p>
       </div>
     </div>
   );
@@ -877,22 +863,18 @@ function Rail({deals,activeId,onPick,onNew,open,loaded,user,onSignOut,onSettings
     <div className={"rail"+(open?" open":"")}>
       <div className="brand">
         <div className="logo">
-          <svg viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="6.5" stroke="#5ab0ff" strokeWidth="1.4"/>
-            <ellipse cx="12" cy="12" rx="11" ry="4.2" stroke="#ffb02e" strokeWidth="1.3" transform="rotate(-24 12 12)"/>
-            <circle cx="12" cy="12" r="2.1" fill="#ffb02e"/>
-          </svg>
+          <img src="dd.png" alt="Deal Deck" className="logo-img"/>
         </div>
         <div>
           <h1>Deal Deck</h1>
-          <div className="sub">Deal Review - Beta</div>
+          <div className="sub">Deal Review</div>
         </div>
         <button className="gear" onClick={onSettings} title="Settings">⚙</button>
       </div>
 
       <div className="secure">
         <div className="dot"></div>
-        <span>Private workspace - CIMs &amp; analysis stay on this deck. Not shared or published.</span>
+        <span>Private workspace — CIMs &amp; analysis stay on this deck. Not shared or published.</span>
       </div>
 
       <button className="newbtn" onClick={onNew}>
@@ -917,7 +899,7 @@ function Rail({deals,activeId,onPick,onNew,open,loaded,user,onSignOut,onSettings
             <span className={"rlight "+(d.status==="analyzing"?"pulse WATCH":d.verdict||"")}></span>
             <span style={{minWidth:0,flex:1}}>
               <div className="rname">{d.name||"Untitled CIM"}</div>
-              <div className="rmeta">{d.status==="analyzing"?"analyzing…":(d.verdict||"-")+" · "+(d.ebitda||"n/a")}</div>
+              <div className="rmeta">{d.status==="analyzing"?"analyzing…":(d.verdict||"—")+" · "+(d.ebitda||"n/a")}</div>
             </span>
             {d.status!=="analyzing" && <span className="rscore" style={{color:scoreColor(d.overall)}}>{d.overall??"–"}</span>}
           </button>
@@ -947,15 +929,15 @@ function Empty({onNew,loaded}){
       <div>
         <svg className="ring" viewBox="0 0 120 120" fill="none">
           <circle cx="60" cy="60" r="46" stroke="#1c2a41" strokeWidth="2"/>
-          <circle cx="60" cy="60" r="46" stroke="#5ab0ff" strokeWidth="2" strokeDasharray="4 10" opacity=".6">
+          <circle cx="60" cy="60" r="46" stroke="#a970ff" strokeWidth="2" strokeDasharray="4 10" opacity=".6">
             <animateTransform attributeName="transform" type="rotate" from="0 60 60" to="360 60 60" dur="22s" repeatCount="indefinite"/>
           </circle>
-          <ellipse cx="60" cy="60" rx="54" ry="20" stroke="#ffb02e" strokeWidth="2" transform="rotate(-24 60 60)" opacity=".8"/>
-          <circle cx="60" cy="60" r="7" fill="#ffb02e"/>
+          <ellipse cx="60" cy="60" rx="54" ry="20" stroke="#ffd23f" strokeWidth="2" transform="rotate(-24 60 60)" opacity=".8"/>
+          <circle cx="60" cy="60" r="7" fill="#ffd23f"/>
         </svg>
         <div className="eyebrow" style={{marginBottom:14}}>Deal review · flight deck</div>
         <h2>Bring a CIM aboard.</h2>
-        <p>Upload a Confidential Information Memorandum and Deal Deck runs a first-pass read against the investment thesis - summary, pros and cons, ratings, a verdict, and next steps. Then refine the review and ask questions in a private chat grounded in the document.</p>
+        <p>Upload a Confidential Information Memorandum and Deal Deck runs a first-pass read against the investment thesis — summary, pros and cons, ratings, a verdict, and next steps. Then refine the review and ask questions in a private chat grounded in the document.</p>
         <button className="newbtn" style={{display:"inline-flex",width:"auto",margin:0,padding:"12px 22px"}} onClick={onNew}>
           <span style={{fontSize:16}}>＋</span> Upload your first CIM
         </button>
@@ -1010,7 +992,7 @@ function DealHeader({deal,onDelete}){
         <div className="h-one">{deal.oneLiner}</div>
         <div className="tel">
           {tel.map(([k,v])=>(
-            <div className="tcell" key={k}><div className="k">{k}</div><div className="v">{v||"-"}</div></div>
+            <div className="tcell" key={k}><div className="k">{k}</div><div className="v">{v||"—"}</div></div>
           ))}
         </div>
       </div>
@@ -1143,7 +1125,7 @@ function Review({deal,saveDeal}){
   return (
     <div>
       <div className="card">
-        <p className="lead" style={{marginTop:0}}>Everything here is yours to overwrite - the AI pass is a starting point, not the record. Your edits are what the deck keeps.</p>
+        <p className="lead" style={{marginTop:0}}>Everything here is yours to overwrite — the AI pass is a starting point, not the record. Your edits are what the deck keeps.</p>
         <div className="field"><label>Deal summary</label>
           <textarea rows="4" value={d.summary||""} onChange={e=>upd({summary:e.target.value})}/></div>
 
@@ -1157,7 +1139,7 @@ function Review({deal,saveDeal}){
 
       <div className="card" style={{marginTop:16}}>
         <h3>Reported figures <span className="tag ai">CONFIRM</span></h3>
-        <p className="lead" style={{marginTop:-6}}>Pulled from the CIM. Correct anything the AI misread - the <b>Financial quality</b> score and overall recompute from these instantly.</p>
+        <p className="lead" style={{marginTop:-6}}>Pulled from the CIM. Correct anything the AI misread — the <b>Financial quality</b> score and overall recompute from these instantly.</p>
         <div className="fingrid">
           {[["revenue","Revenue"],["ebitda","Adj. EBITDA"],["revPrior","Revenue (prior yr)"],["ebitdaPrior","EBITDA (prior yr)"],["netDebt","Net / LT debt"],["currentAssets","Current assets"],["currentLiab","Current liabilities"]].map(([k,label])=>(
             <div className="field" key={k} style={{marginBottom:0}}>
@@ -1194,7 +1176,7 @@ function Review({deal,saveDeal}){
       </div>
 
       <div className="card" style={{marginTop:16}}>
-        <div className="field" style={{marginBottom:20}}><label>Overall deal score - {d.overall??0}</label>
+        <div className="field" style={{marginBottom:20}}><label>Overall deal score — {d.overall??0}</label>
           <input type="range" min="0" max="100" value={d.overall??0} onChange={e=>upd({overall:+e.target.value})}/></div>
         <div className="field" style={{marginBottom:0}}><label>Final verdict</label>
           <div className="verdictpick">{VERDICTS.map(v=>(
@@ -1211,7 +1193,7 @@ function Review({deal,saveDeal}){
 
       <div className="card" style={{marginTop:16}}><h3>Analyst notes</h3>
         <div className="field" style={{marginBottom:0}}>
-          <textarea rows="4" placeholder="Your own read - anything the AI missed, gut checks, questions for the seller call…"
+          <textarea rows="4" placeholder="Your own read — anything the AI missed, gut checks, questions for the seller call…"
             value={d.analystNotes||""} onChange={e=>upd({analystNotes:e.target.value})}/></div>
       </div>
 
@@ -1237,7 +1219,7 @@ function ListEdit({items,onChange,onAdd,onDel,ph}){
 }
 
 /* ---------- Chat ---------- */
-function cocCellBg(v){ if(v>=0.25) return "rgba(55,217,160,.22)"; if(v>=0.15) return "rgba(255,176,46,.16)"; if(v>=0) return "rgba(255,93,108,.14)"; return "rgba(255,93,108,.3)"; }
+function cocCellBg(v){ if(v>=0.25) return "rgba(55,217,160,.22)"; if(v>=0.15) return "rgba(255,210,63,.16)"; if(v>=0) return "rgba(255,93,108,.14)"; return "rgba(255,93,108,.3)"; }
 function cocText(v){ if(v>=0.25) return "var(--go)"; if(v>=0.15) return "var(--watch)"; return "var(--pass)"; }
 function dscrColor(v){ if(v>=1.5) return "var(--go)"; if(v>=1.25) return "var(--watch)"; return "var(--pass)"; }
 
@@ -1269,7 +1251,7 @@ function Model({deal,saveDeal,settings}){
   const passCoC=m.coc1>=COC_TARGET, passDSCR=(!isFinite(m.dscr)||m.dscr>=DSCR_FLOOR), inBand=a.mult>=bandLo&&a.mult<=bandHi;
   const clears=passCoC&&passDSCR;
   const bandTxt=`${bandLo}–${bandHi}×`;
-  const readState = adjE<=0 ? "ENTER EBITDA TO MODEL" : clears ? (inBand?"CLEARS THE HURDLES":`WORKS - PRICED ABOVE ${bandTxt} BAND`) : "BELOW THE HURDLES";
+  const readState = adjE<=0 ? "ENTER EBITDA TO MODEL" : clears ? (inBand?"CLEARS THE HURDLES":`WORKS — PRICED ABOVE ${bandTxt} BAND`) : "BELOW THE HURDLES";
   const readColor = adjE<=0 ? "var(--muted)" : clears ? (inBand?"var(--go)":"var(--watch)") : "var(--pass)";
   const maxMult = adjE>0 ? maxEntryMultiple(adjE,a,COC_TARGET,DSCR_FLOOR) : null;
   const maxPriceUSD = maxMult!=null ? adjE*maxMult : null;
@@ -1312,7 +1294,7 @@ function Model({deal,saveDeal,settings}){
             : <div className="solver-val" style={{color:"var(--pass)"}}>No price clears both hurdles <span className="solver-x">at these assumptions</span></div>}
           <div className="solver-sub">
             {maxMult!=null
-              ? (a.mult<=maxMult+1e-9 ? "Your current price is within the disciplined range." : "Your current price is above this - you'd break a hurdle.")
+              ? (a.mult<=maxMult+1e-9 ? "Your current price is within the disciplined range." : "Your current price is above this — you'd break a hurdle.")
               : "Lower leverage or rate, or require faster growth, to open room."}
           </div>
         </div>
@@ -1348,7 +1330,7 @@ function Model({deal,saveDeal,settings}){
           <Sl label="Cash tax rate" val={a.tax} disp={(a.tax*100).toFixed(0)+"%"} min={0} max={0.4} step={0.01} onCh={v=>setAsm("tax",v)}/>
           <Sl label="Illustrative hold" val={a.hold} disp={a.hold+" yr"} min={3} max={10} step={1} onCh={v=>setAsm("hold",v)}/>
           <Sl label="Exit multiple" val={a.exit} disp={a.exit.toFixed(2)+"×"} min={2} max={8} step={0.25} onCh={v=>setAsm("exit",v)}/>
-          <p className="lead" style={{margin:"6px 0 0"}}>Autosaves. Permanent-hold basis - MOIC/IRR use the exit multiple only to sketch value, not as a sale plan.</p>
+          <p className="lead" style={{margin:"6px 0 0"}}>Autosaves. Permanent-hold basis — MOIC/IRR use the exit multiple only to sketch value, not as a sale plan.</p>
         </div>
 
         <div>
@@ -1378,18 +1360,18 @@ function Model({deal,saveDeal,settings}){
               <div className="ratings">
                 <div className="rrow"><div className="rl"><span className="name">Cumulative distributions ({a.hold}y)</span><span className="num">{fmtUSD(m.cumDist)}</span></div></div>
                 <div className="rrow"><div className="rl"><span className="name">Terminal equity @ {a.exit.toFixed(2)}×</span><span className="num">{fmtUSD(m.terminalEquity)}</span></div></div>
-                <div className="rrow"><div className="rl"><span className="name">MOIC</span><span className="num">{m.moic?m.moic.toFixed(2)+"×":"-"}</span></div></div>
+                <div className="rrow"><div className="rl"><span className="name">MOIC</span><span className="num">{m.moic?m.moic.toFixed(2)+"×":"—"}</span></div></div>
                 <div className="rrow"><div className="rl"><span className="name">IRR</span><span className="num" style={{color:cocText(m.irr)}}>{fmtPct(m.irr)}</span></div></div>
               </div>
             </div>
             <div className="card">
               <h3>Trend &amp; quality</h3>
               <div className="ratings">
-                <div className="rrow"><div className="rl"><span className="name">Revenue (latest)</span><span className="num">{fin.revenue?fmtUSD(fin.revenue):"-"}</span></div></div>
-                <div className="rrow"><div className="rl"><span className="name">Revenue YoY</span><span className="num" style={{color:revYoY!=null?cocText(revYoY+0.15):"inherit"}}>{revYoY!=null?fmtPct(revYoY):"-"}</span></div></div>
-                <div className="rrow"><div className="rl"><span className="name">EBITDA margin</span><span className="num">{margin!=null?fmtPct(margin):"-"}</span></div></div>
-                <div className="rrow"><div className="rl"><span className="name">EBITDA YoY</span><span className="num">{ebYoY!=null?fmtPct(ebYoY):"-"}</span></div></div>
-                <div className="rrow"><div className="rl"><span className="name">Current ratio</span><span className="num">{curRatio!=null?curRatio.toFixed(1)+"×":"-"}</span></div></div>
+                <div className="rrow"><div className="rl"><span className="name">Revenue (latest)</span><span className="num">{fin.revenue?fmtUSD(fin.revenue):"—"}</span></div></div>
+                <div className="rrow"><div className="rl"><span className="name">Revenue YoY</span><span className="num" style={{color:revYoY!=null?cocText(revYoY+0.15):"inherit"}}>{revYoY!=null?fmtPct(revYoY):"—"}</span></div></div>
+                <div className="rrow"><div className="rl"><span className="name">EBITDA margin</span><span className="num">{margin!=null?fmtPct(margin):"—"}</span></div></div>
+                <div className="rrow"><div className="rl"><span className="name">EBITDA YoY</span><span className="num">{ebYoY!=null?fmtPct(ebYoY):"—"}</span></div></div>
+                <div className="rrow"><div className="rl"><span className="name">Current ratio</span><span className="num">{curRatio!=null?curRatio.toFixed(1)+"×":"—"}</span></div></div>
               </div>
             </div>
           </div>
@@ -1439,7 +1421,7 @@ Ground every answer in the deal facts below; if something isn't covered, say it'
 === DEAL: ${deal.name} ===
 ${deal.digest||deal.summary}
 
-CURRENT VERDICT: ${deal.verdict} (${deal.overall}/100) - ${deal.verdictReason}
+CURRENT VERDICT: ${deal.verdict} (${deal.overall}/100) — ${deal.verdictReason}
 PROS: ${(deal.pros||[]).join("; ")}
 CONS: ${(deal.cons||[]).join("; ")}
 RISKS: ${(deal.risks||[]).join("; ")}`;
@@ -1467,7 +1449,7 @@ RISKS: ${(deal.risks||[]).join("; ")}`;
         {messages.length===0 && !busy &&
           <div>
             <div className="chatnote">
-              Ask anything about <strong style={{color:"var(--ink)"}}>{deal.name}</strong>. Answers are grounded in this CIM and the investment thesis - the conversation stays on this deck.
+              Ask anything about <strong style={{color:"var(--ink)"}}>{deal.name}</strong>. Answers are grounded in this CIM and the investment thesis — the conversation stays on this deck.
             </div>
             <div className="suggest">{suggestions.map(s=>
               <button key={s} className="chip" onClick={()=>send(s)}>{s}</button>)}</div>
@@ -1546,7 +1528,7 @@ function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,setRoute,pdfCach
       console.error(e);
       let base;
       if(e.message==="PDF_EMPTY")
-        base="Couldn't pull text from that PDF - it's likely scanned or image-only. Open it, copy the text, and paste it in the box below instead.";
+        base="Couldn't pull text from that PDF — it's likely scanned or image-only. Open it, copy the text, and paste it in the box below instead.";
       else{ base=friendlyError(e); if(base.startsWith("Something went wrong")) base="The analysis didn't come back cleanly. Try again, or paste the key text below."; }
       setErr(base);
       setPhase("error");
@@ -1578,7 +1560,7 @@ function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,setRoute,pdfCach
             <button className="x" onClick={()=>setFile(null)}>✕</button>
           </div>}
 
-          <div className="or">- OR PASTE TEXT -</div>
+          <div className="or">— OR PASTE TEXT —</div>
           <textarea placeholder="Paste the CIM text here if you don't have the PDF handy…"
             value={pasted} onChange={e=>setPasted(e.target.value)}/>
 
@@ -1594,11 +1576,11 @@ function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,setRoute,pdfCach
           <div className="eyebrow" style={{marginBottom:16}}>Analyzing</div>
           <svg viewBox="0 0 120 120" style={{width:96}} fill="none">
             <circle cx="60" cy="60" r="44" stroke="#1c2a41" strokeWidth="3"/>
-            <circle cx="60" cy="60" r="44" stroke="#5ab0ff" strokeWidth="3" strokeLinecap="round"
+            <circle cx="60" cy="60" r="44" stroke="#a970ff" strokeWidth="3" strokeLinecap="round"
               strokeDasharray="70 210" >
               <animateTransform attributeName="transform" type="rotate" from="0 60 60" to="360 60 60" dur="1.1s" repeatCount="indefinite"/>
             </circle>
-            <circle cx="60" cy="60" r="6" fill="#ffb02e"/>
+            <circle cx="60" cy="60" r="6" fill="#ffd23f"/>
           </svg>
           <div className="prog"><i style={{width:prog+"%"}}></i></div>
           <div className="scan">{scan}</div>
@@ -1609,7 +1591,7 @@ function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,setRoute,pdfCach
 }
 function clamp(n){ n=+n; if(isNaN(n)) return 0; return Math.max(0,Math.min(100,Math.round(n))); }
 // Headline score, computed from the sub-ratings (weighted to the firm's priorities) rather
-// than trusted from the model - which otherwise flattens everything to ~75.
+// than trusted from the model — which otherwise flattens everything to ~75.
 function overallFromRatings(r, weights){
   if(!r || typeof r!=="object") return null;
   const w = weights || CFG.weights;
@@ -1629,16 +1611,16 @@ function SettingsModal({settings,onSave,onClose}){
       <div className="modal settings-modal">
         <div className="eyebrow" style={{marginBottom:8}}>Company ideals</div>
         <h2>Settings</h2>
-        <p className="sub">These drive how the AI reads every CIM - the mandate it judges against, your hurdles, and how the score is weighted. Changes apply to new analyses and to the Model tab.</p>
+        <p className="sub">These drive how the AI reads every CIM — the mandate it judges against, your hurdles, and how the score is weighted. Changes apply to new analyses and to the Model tab.</p>
 
         <div className="field"><label>Investment thesis / mandate</label>
           <textarea rows="4" value={s.thesis} onChange={e=>set("thesis",e.target.value)}/></div>
 
         <div className="setgrid">
-          <div className="field"><label>EBITDA sweet spot - min ($M)</label><input type="number" step="0.5" value={s.ebitdaMin} onChange={e=>set("ebitdaMin",+e.target.value)}/></div>
-          <div className="field"><label>EBITDA sweet spot - max ($M)</label><input type="number" step="0.5" value={s.ebitdaMax} onChange={e=>set("ebitdaMax",+e.target.value)}/></div>
-          <div className="field"><label>Entry multiple - low (×)</label><input type="number" step="0.25" value={s.multLow} onChange={e=>set("multLow",+e.target.value)}/></div>
-          <div className="field"><label>Entry multiple - high (×)</label><input type="number" step="0.25" value={s.multHigh} onChange={e=>set("multHigh",+e.target.value)}/></div>
+          <div className="field"><label>EBITDA sweet spot — min ($M)</label><input type="number" step="0.5" value={s.ebitdaMin} onChange={e=>set("ebitdaMin",+e.target.value)}/></div>
+          <div className="field"><label>EBITDA sweet spot — max ($M)</label><input type="number" step="0.5" value={s.ebitdaMax} onChange={e=>set("ebitdaMax",+e.target.value)}/></div>
+          <div className="field"><label>Entry multiple — low (×)</label><input type="number" step="0.25" value={s.multLow} onChange={e=>set("multLow",+e.target.value)}/></div>
+          <div className="field"><label>Entry multiple — high (×)</label><input type="number" step="0.25" value={s.multHigh} onChange={e=>set("multHigh",+e.target.value)}/></div>
           <div className="field"><label>Target cash-on-cash (%)</label><input type="number" step="1" value={s.cocTarget} onChange={e=>set("cocTarget",+e.target.value)}/></div>
           <div className="field"><label>Minimum DSCR (×)</label><input type="number" step="0.05" value={s.dscrFloor} onChange={e=>set("dscrFloor",+e.target.value)}/></div>
         </div>
@@ -1648,7 +1630,7 @@ function SettingsModal({settings,onSave,onClose}){
         <div className="field"><label>Deal-breakers (optional)</label>
           <textarea rows="2" placeholder="e.g. heavy customer concentration, tech-obsolescence risk, leverage above 4×…" value={s.avoid} onChange={e=>set("avoid",e.target.value)}/></div>
 
-        <div className="field" style={{marginBottom:6}}><label>Overall-score weights - how much each dimension counts (now {wsum}%)</label></div>
+        <div className="field" style={{marginBottom:6}}><label>Overall-score weights — how much each dimension counts (now {wsum}%)</label></div>
         <div className="wgrid">
           {RATING_KEYS.map(([k,label])=>(
             <div className="wrow" key={k}>
@@ -1658,8 +1640,8 @@ function SettingsModal({settings,onSave,onClose}){
             </div>
           ))}
         </div>
-        {Math.abs(wsum-100)>0.5 && <div className="wnote">Weights total {wsum}% - they're normalized automatically, but 100% is tidiest.</div>}
-        <p className="lead" style={{margin:"10px 0 0"}}>Note: the <b>Financial quality</b> score is computed from the CIM's numbers (margin, growth, leverage), not guessed - so it's grounded regardless of weight.</p>
+        {Math.abs(wsum-100)>0.5 && <div className="wnote">Weights total {wsum}% — they're normalized automatically, but 100% is tidiest.</div>}
+        <p className="lead" style={{margin:"10px 0 0"}}>Note: the <b>Financial quality</b> score is computed from the CIM's numbers (margin, growth, leverage), not guessed — so it's grounded regardless of weight.</p>
 
         <div className="mfoot">
           <button className="ghost" onClick={()=>setS(normSettings(null))}>Reset to defaults</button>
@@ -1674,7 +1656,7 @@ function SettingsModal({settings,onSave,onClose}){
 
 /* ================= PIPELINE · DILIGENCE · MEMO · BENCHMARK ================= */
 const STAGES=["New","Screening","Diligence","IC","Offer","Closed","Passed"];
-function stageColor(s){ return ({New:"#8496b3",Screening:"#5ab0ff",Diligence:"#ffb02e",IC:"#c084fc",Offer:"#37d9a0",Closed:"#37d9a0",Passed:"#ff5d6c"})[s]||"#8496b3"; }
+function stageColor(s){ return ({New:"#8496b3",Screening:"#a970ff",Diligence:"#ffd23f",IC:"#c084fc",Offer:"#37d9a0",Closed:"#37d9a0",Passed:"#ff5d6c"})[s]||"#8496b3"; }
 
 // parse "$2.4M", "$395.2 million", "12,163,791" -> number
 function parseMoney(str){
@@ -1753,7 +1735,7 @@ function Compare({deals,onPick,onNew}){
     <div className="stage"><div className="wrap">
       <div className="eyebrow" style={{marginBottom:6}}>Compare</div>
       <h2 style={{fontFamily:"Space Grotesk",fontWeight:600,fontSize:24,margin:"0 0 6px",letterSpacing:"-.01em"}}>Side by side</h2>
-      <p className="lead" style={{marginTop:0}}>Pick up to four deals to line up - the best value in each row is marked ★.</p>
+      <p className="lead" style={{marginTop:0}}>Pick up to four deals to line up — the best value in each row is marked ★.</p>
 
       <div className="cmp-pick">
         {deals.map(d=>{ const on=sel.includes(d.id); return (
@@ -1776,7 +1758,7 @@ function Compare({deals,onPick,onNew}){
                 <tr key={ri}>
                   <td className="rowlab">{row.label}</td>
                   {picked.map((d,i)=>{ const v=row.get(d);
-                    const disp=(v==null||(typeof v==="number"&&isNaN(v)))?"-":row.fmt(v);
+                    const disp=(v==null||(typeof v==="number"&&isNaN(v)))?"—":row.fmt(v);
                     const col=(v!=null&&row.color)?row.color(v):"var(--ink)";
                     return <td key={d.id} className={"mono"+(i===bi?" best":"")} style={{color:col}}>{disp}{i===bi?<span className="star">★</span>:null}</td>;
                   })}
@@ -1795,7 +1777,7 @@ function BenchStrip({deal,deals}){
   const q=dealQuick(deal);
   const margin=deal.fin&&deal.fin.revenue?deal.fin.ebitda/deal.fin.revenue:null;
   const cell=(label,v,avg,fmt,better)=>{ const delta=(v!=null&&avg!=null)?v-avg:null;
-    return <div className="bcell"><div className="k">{label}</div><div className="v">{v!=null?fmt(v):"-"}</div>
+    return <div className="bcell"><div className="k">{label}</div><div className="v">{v!=null?fmt(v):"—"}</div>
       <div className="d" style={{color:delta==null?"var(--muted-2)":(better(delta)?"var(--go)":"var(--pass)")}}>{avg!=null?"pipeline "+fmt(avg):""}</div></div>; };
   return <div className="bench">
     <span className="eyebrow" style={{alignSelf:"center",whiteSpace:"nowrap"}}>vs pipeline · {others.length}</span>
@@ -1806,7 +1788,7 @@ function BenchStrip({deal,deals}){
 }
 
 function buildDiligencePrompt(deal, s){
-  return `You are a buy-side diligence lead for a permanent-hold acquirer. A CIM is written by the seller to sell - your job is to find what it does NOT say and what a buyer must independently verify.
+  return `You are a buy-side diligence lead for a permanent-hold acquirer. A CIM is written by the seller to sell — your job is to find what it does NOT say and what a buyer must independently verify.
 FIRM MANDATE: ${s.thesis}
 Return ONLY JSON:
 {
@@ -1838,7 +1820,7 @@ function Diligence({deal,saveDeal,settings}){
   if(!dg && !busy) return (
     <div className="card" style={{textAlign:"center",padding:"38px 24px"}}>
       <h3 style={{justifyContent:"center"}}>Diligence pack <span className="tag ai">AI</span></h3>
-      <p className="lead" style={{maxWidth:470,margin:"0 auto 20px"}}>A skeptical, buy-side read of what the CIM leaves out - red flags, missing information, a document-request list, and sharp questions for the seller call.</p>
+      <p className="lead" style={{maxWidth:470,margin:"0 auto 20px"}}>A skeptical, buy-side read of what the CIM leaves out — red flags, missing information, a document-request list, and sharp questions for the seller call.</p>
       <button className="savebtn" onClick={gen}>Generate diligence pack</button>
       {err && <div className="errbox" style={{marginTop:14,textAlign:"left"}}>{err}</div>}
     </div>);
@@ -1870,7 +1852,7 @@ function openMemo(deal){
   const row=(k,v)=>v?`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`:"";
   const li=(arr)=>(arr||[]).map(x=>`<li>${esc(x)}</li>`).join("");
   const dg=deal.diligence;
-  const html=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(deal.name)} - Deal Memo</title><style>
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(deal.name)} — Deal Memo</title><style>
     *{box-sizing:border-box}body{font:13px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,sans-serif;color:#111;margin:40px;max-width:820px}
     h1{font-size:22px;margin:0 0 2px}.sub{color:#555;margin:0 0 16px}
     h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#0a7a55;border-bottom:2px solid #0a7a55;padding-bottom:4px;margin:22px 0 10px}
@@ -1885,21 +1867,21 @@ function openMemo(deal){
   <p class="sub">${esc(deal.oneLiner||"")}${deal.industry?" · "+esc(deal.industry):""}${deal.location?" · "+esc(deal.location):""}</p>
   <div class="tiles">
     <div class="tile"><div class="k">Overall</div><div class="v">${deal.overall==null?"–":deal.overall}/100</div></div>
-    <div class="tile"><div class="k">Verdict</div><div class="v">${esc(deal.verdict||"-")}</div></div>
-    <div class="tile"><div class="k">Adj. EBITDA</div><div class="v">${q.adjE?fmtUSD(q.adjE):esc(deal.ebitda||"-")}</div></div>
-    <div class="tile"><div class="k">Entry×</div><div class="v">${q.mult?q.mult.toFixed(2)+"×":"-"}</div></div>
-    <div class="tile"><div class="k">Cash-on-cash</div><div class="v">${q.coc1!=null?Math.round(q.coc1*100)+"%":"-"}</div></div>
-    <div class="tile"><div class="k">DSCR</div><div class="v">${q.dscr!=null&&isFinite(q.dscr)?q.dscr.toFixed(2)+"×":"-"}</div></div>
+    <div class="tile"><div class="k">Verdict</div><div class="v">${esc(deal.verdict||"—")}</div></div>
+    <div class="tile"><div class="k">Adj. EBITDA</div><div class="v">${q.adjE?fmtUSD(q.adjE):esc(deal.ebitda||"—")}</div></div>
+    <div class="tile"><div class="k">Entry×</div><div class="v">${q.mult?q.mult.toFixed(2)+"×":"—"}</div></div>
+    <div class="tile"><div class="k">Cash-on-cash</div><div class="v">${q.coc1!=null?Math.round(q.coc1*100)+"%":"—"}</div></div>
+    <div class="tile"><div class="k">DSCR</div><div class="v">${q.dscr!=null&&isFinite(q.dscr)?q.dscr.toFixed(2)+"×":"—"}</div></div>
   </div>
   <h2>Summary</h2><p>${esc(deal.summary||"")}</p>
-  <h2>Recommendation</h2><p><span class="verdict">${esc(deal.verdict||"-")}</span>&nbsp; ${esc(deal.verdictReason||"")}</p>
+  <h2>Recommendation</h2><p><span class="verdict">${esc(deal.verdict||"—")}</span>&nbsp; ${esc(deal.verdictReason||"")}</p>
   <h2>Key facts</h2><table>${row("Revenue",deal.revenue)}${row("Adj. EBITDA",deal.ebitda)}${row("Years in business",deal.years)}${row("Asking",deal.askNote)}${row("Stage",deal.stage)}</table>
   <div class="cols"><div><h2>Pros</h2><ul>${li(deal.pros)}</ul></div><div><h2>Cons</h2><ul>${li(deal.cons)}</ul></div></div>
   <h2>Risks</h2><ul>${li(deal.risks)}</ul>
   <h2>Recommended next steps</h2><ol>${li(deal.nextSteps)}</ol>
-  ${dg?`<h2>Diligence - red flags</h2><ul>${li(dg.redFlags)}</ul><h2>Missing from the CIM</h2><ul>${li(dg.missingInfo)}</ul><h2>Document requests</h2><ol>${li(dg.requests)}</ol><h2>Seller-call questions</h2><ol>${li(dg.questions)}</ol>`:""}
+  ${dg?`<h2>Diligence — red flags</h2><ul>${li(dg.redFlags)}</ul><h2>Missing from the CIM</h2><ul>${li(dg.missingInfo)}</ul><h2>Document requests</h2><ol>${li(dg.requests)}</ol><h2>Seller-call questions</h2><ol>${li(dg.questions)}</ol>`:""}
   ${deal.analystNotes?`<h2>Analyst notes</h2><p>${esc(deal.analystNotes)}</p>`:""}
-  <div class="foot">Deal Deck - generated ${new Date().toLocaleString()} · Confidential</div>
+  <div class="foot">Deal Deck — generated ${new Date().toLocaleString()} · Confidential</div>
   <scr`+`ipt>window.onload=function(){setTimeout(function(){window.print();},300);}</scr`+`ipt>
   </body></html>`;
   const w=window.open("","_blank");

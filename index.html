@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Saturn Five · Deal Deck</title>
+<title>Deal Deck</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -302,7 +302,7 @@
   .abk .keep{font-family:"JetBrains Mono";font-size:9.5px;color:var(--muted-2);text-align:right;margin-top:4px}
   @media (max-width:860px){ .kpis{grid-template-columns:1fr 1fr} .mgrid{grid-template-columns:1fr} }
 
-  /* model: S5 read banner + price solver */
+  /* model: read banner + price solver */
   .s5read{display:flex;align-items:center;justify-content:space-between;gap:16px;
     background:linear-gradient(180deg,var(--panel),rgba(19,30,48,.4));border:1px solid var(--line-soft);
     border-left-width:3px;border-radius:12px;padding:14px 18px;margin-bottom:16px}
@@ -346,7 +346,7 @@ const RATING_KEYS = [
   ["market","Market & industry"],
   ["moat","Moat / durability"],
   ["management","Mgmt & transition"],
-  ["fit","S5 thesis fit"],
+  ["fit","Thesis fit"],
 ];
 
 /* ---------- storage helpers ---------- */
@@ -451,7 +451,7 @@ async function extractPdfText(file, onProgress){
   return out.trim();
 }
 
-const ANALYSIS_PROMPT = `You are the lead analyst on Saturn Five's Deals Team. Saturn Five is a permanent-hold investment firm that buys controlling interests in durable, cash-flow-generating small businesses — typically $2–10M EBITDA, bought at 4–6x, blue-collar / "moves atoms" (trades, manufacturing, service). No fund clock: returns come from ongoing distributions (~25% cash-on-cash target), not exits. Judge this deal against THAT thesis.
+const ANALYSIS_PROMPT = `You are the lead analyst on the deals team. The firm is a permanent-hold investment firm that buys controlling interests in durable, cash-flow-generating small businesses — typically $2–10M EBITDA, bought at 4–6x, blue-collar / "moves atoms" (trades, manufacturing, service). No fund clock: returns come from ongoing distributions (~25% cash-on-cash target), not exits. Judge this deal against THAT thesis.
 
 Read the attached Confidential Information Memorandum and return ONLY a JSON object (no markdown, no prose) with EXACTLY these keys:
 {
@@ -470,7 +470,7 @@ Read the attached Confidential Information Memorandum and return ONLY a JSON obj
  "ratings": {"financials":int,"market":int,"moat":int,"management":int,"fit":int}, // each 0-100, see SCORING below
  "overall": int,                       // 0-100 (will be recomputed; still give your best estimate)
  "verdict": "PURSUE"|"WATCH"|"PASS",
- "verdictReason": string,              // <=32 words, why this verdict for S5 specifically
+ "verdictReason": string,              // <=32 words, why this verdict for this strategy specifically
  "nextSteps": [string]                 // 4 concrete diligence / process steps, each <=18 words
  ,"fin": {                             // best-effort numbers in USD (plain integers, no $/commas); use 0 if unknown
    "ebitda": number,                   // most recent ADJUSTED EBITDA
@@ -498,10 +498,10 @@ The five dimensions measure DIFFERENT things, so their scores should differ from
   - market: industry durability, demand, cyclicality, fragmentation
   - moat: switching costs, licensing, capability barriers, customer stickiness
   - management: depth below the owner, transition/key-person risk
-  - fit: match to S5 (permanent hold, $2-10M EBITDA, 4-6x, blue-collar, cash generative)
+  - fit: match to the firm's strategy (permanent hold, $2-10M EBITDA, 4-6x, blue-collar, cash generative)
 Most real deals land in the 50-70 range. Reserve 80+ for genuinely excellent attributes and use sub-45 when warranted. DO NOT default every score to ~75 — a flat, uniform score set is a failure.`;
 
-const DIGEST_PROMPT = `You are briefing Saturn Five's Deals Team. Read the attached CIM and write a dense ~230-word factual digest capturing: what the company does, financials (revenue, EBITDA, margins, growth), customers & concentration, operations/assets, management & transition, deal structure, and notable risks. Plain text, no headers, no preamble. This will ground later Q&A, so pack in the concrete facts and numbers.`;
+const DIGEST_PROMPT = `You are briefing the deals team. Read the attached CIM and write a dense ~230-word factual digest capturing: what the company does, financials (revenue, EBITDA, margins, growth), customers & concentration, operations/assets, management & transition, deal structure, and notable risks. Plain text, no headers, no preamble. This will ground later Q&A, so pack in the concrete facts and numbers.`;
 
 /* ---------- finance helpers ---------- */
 function amortPayment(rate, nper, pv){ // annual payment on amortizing loan
@@ -628,7 +628,7 @@ function AuthScreen({ready,onCredential}){
           </svg>
         </div>
         <h1>Deal Deck</h1>
-        <p>Saturn Five's private deal-review station. Sign in to open your pipeline.</p>
+        <p>A private deal-review station. Sign in to open your pipeline.</p>
         <div className="gbtn" ref={btnRef}>{!ready && <span className="dots"><span></span><span></span><span></span></span>}</div>
         <div className="authnote"><span className="dot"></span>CIMs, reviews &amp; chats stay in your account. Not shared or published.</div>
       </div>
@@ -728,7 +728,7 @@ function Rail({deals,activeId,onPick,onNew,open,loaded,user,onSignOut}){
         </div>
         <div>
           <h1>Deal Deck</h1>
-          <div className="sub">Saturn Five · Deals</div>
+          <div className="sub">Deal Review</div>
         </div>
       </div>
 
@@ -793,7 +793,7 @@ function Empty({onNew,loaded}){
         </svg>
         <div className="eyebrow" style={{marginBottom:14}}>Deal review · flight deck</div>
         <h2>Bring a CIM aboard.</h2>
-        <p>Upload a Confidential Information Memorandum and Deal Deck runs a first-pass read against the Saturn Five thesis — summary, pros and cons, ratings, a verdict, and next steps. Then refine the review and ask questions in a private chat grounded in the document.</p>
+        <p>Upload a Confidential Information Memorandum and Deal Deck runs a first-pass read against the investment thesis — summary, pros and cons, ratings, a verdict, and next steps. Then refine the review and ask questions in a private chat grounded in the document.</p>
         <button className="newbtn" style={{display:"inline-flex",width:"auto",margin:0,padding:"12px 22px"}} onClick={onNew}>
           <span style={{fontSize:16}}>＋</span> Upload your first CIM
         </button>
@@ -893,7 +893,7 @@ function Analysis({deal}){
     <div>
       <div className="card" style={{marginBottom:16}}>
         <h3>Deal summary <span className="tag ai">AI FIRST-PASS</span></h3>
-        <p className="lead">Generated from the CIM against the S5 thesis. Refine anything in the Review tab.</p>
+        <p className="lead">Generated from the CIM against the investment thesis. Refine anything in the Review tab.</p>
         <div className="summary">{deal.summary}</div>
         <div style={{marginTop:16,padding:"12px 15px",borderRadius:10,background:"var(--deck)",borderLeft:"3px solid "+verdictColor(deal.verdict)}}>
           <span className="eyebrow" style={{color:verdictColor(deal.verdict)}}>Verdict · {deal.verdict}</span>
@@ -1066,7 +1066,7 @@ function Model({deal,saveDeal}){
   const COC_TARGET=0.25, DSCR_FLOOR=1.5;
   const passCoC=m.coc1>=COC_TARGET, passDSCR=(!isFinite(m.dscr)||m.dscr>=DSCR_FLOOR), inBand=a.mult>=4&&a.mult<=6;
   const clears=passCoC&&passDSCR;
-  const readState = adjE<=0 ? "ENTER EBITDA TO MODEL" : clears ? (inBand?"CLEARS S5 HURDLES":"WORKS — PRICED ABOVE 4–6× BAND") : "BELOW S5 HURDLES";
+  const readState = adjE<=0 ? "ENTER EBITDA TO MODEL" : clears ? (inBand?"CLEARS THE HURDLES":"WORKS — PRICED ABOVE 4–6× BAND") : "BELOW THE HURDLES";
   const readColor = adjE<=0 ? "var(--muted)" : clears ? (inBand?"var(--go)":"var(--watch)") : "var(--pass)";
   const maxMult = adjE>0 ? maxEntryMultiple(adjE,a,COC_TARGET,DSCR_FLOOR) : null;
   const maxPriceUSD = maxMult!=null ? adjE*maxMult : null;
@@ -1096,14 +1096,14 @@ function Model({deal,saveDeal}){
           <span className="s5read-txt">
             {adjE<=0
               ? "Add the CIM's adjusted EBITDA below and the whole model comes alive."
-              : <>At <b>{a.mult.toFixed(2)}×</b> with <b>{(a.lev*100).toFixed(0)}%</b> debt, this returns <b style={{color:cocText(m.coc1)}}>{fmtPct(m.coc1)}</b> Yr-1 cash-on-cash{isFinite(m.dscr)?<> at <b style={{color:dscrColor(m.dscr)}}>{m.dscr.toFixed(2)}×</b> coverage</>:" (all-equity, no debt)"}. S5 wants ≥25% and ≥1.5×.</>}
+              : <>At <b>{a.mult.toFixed(2)}×</b> with <b>{(a.lev*100).toFixed(0)}%</b> debt, this returns <b style={{color:cocText(m.coc1)}}>{fmtPct(m.coc1)}</b> Yr-1 cash-on-cash{isFinite(m.dscr)?<> at <b style={{color:dscrColor(m.dscr)}}>{m.dscr.toFixed(2)}×</b> coverage</>:" (all-equity, no debt)"}. Target is ≥25% and ≥1.5×.</>}
           </span>
         </div>
       </div>
 
       {adjE>0 && <div className="solver">
         <div className="solver-main">
-          <div className="k">Most S5 should pay <span className="q" title="Highest entry price that still clears ≥25% cash-on-cash and ≥1.5× DSCR at your current leverage and operating assumptions.">ⓘ</span></div>
+          <div className="k">Most you should pay <span className="q" title="Highest entry price that still clears ≥25% cash-on-cash and ≥1.5× DSCR at your current leverage and operating assumptions.">ⓘ</span></div>
           {maxMult!=null
             ? <div className="solver-val">{fmtUSD(maxPriceUSD)} <span className="solver-x">{maxMult.toFixed(2)}× adj. EBITDA</span></div>
             : <div className="solver-val" style={{color:"var(--pass)"}}>No price clears both hurdles <span className="solver-x">at these assumptions</span></div>}
@@ -1123,7 +1123,7 @@ function Model({deal,saveDeal}){
           <div className="big">{fmtUSD(m.equity)}</div><div className="sub">{fmtUSD(m.debt)} debt @ {(a.rate*100).toFixed(1)}%</div></div>
         <div className="kpi"><div className="k">Yr-1 cash-on-cash</div>
           <div className="big" style={{color:cocText(m.coc1)}}>{fmtPct(m.coc1)}</div>
-          <div className="sub">S5 target ≥ 25%</div></div>
+          <div className="sub">target ≥ 25%</div></div>
         <div className="kpi"><div className="k">DSCR (Yr 1)</div>
           <div className="big" style={{color:dscrColor(m.dscr)}}>{isFinite(m.dscr)?m.dscr.toFixed(2)+"×":"n/a"}</div>
           <div className="sub">covenant floor ~1.25×</div></div>
@@ -1145,7 +1145,7 @@ function Model({deal,saveDeal}){
           <Sl label="Cash tax rate" val={a.tax} disp={(a.tax*100).toFixed(0)+"%"} min={0} max={0.4} step={0.01} onCh={v=>setAsm("tax",v)}/>
           <Sl label="Illustrative hold" val={a.hold} disp={a.hold+" yr"} min={3} max={10} step={1} onCh={v=>setAsm("hold",v)}/>
           <Sl label="Exit multiple" val={a.exit} disp={a.exit.toFixed(2)+"×"} min={2} max={8} step={0.25} onCh={v=>setAsm("exit",v)}/>
-          <p className="lead" style={{margin:"6px 0 0"}}>Autosaves. S5 holds permanently — MOIC/IRR use the exit multiple only to sketch value, they aren't a sale plan.</p>
+          <p className="lead" style={{margin:"6px 0 0"}}>Autosaves. Permanent-hold basis — MOIC/IRR use the exit multiple only to sketch value, not as a sale plan.</p>
         </div>
 
         <div>
@@ -1228,7 +1228,7 @@ function Chat({deal,saveDeal,pdfCache}){
   useEffect(()=>{setMessages(deal.chat||[]);},[deal.id]);
   useEffect(()=>{ if(scrollRef.current) scrollRef.current.scrollTop=scrollRef.current.scrollHeight; },[messages,busy]);
 
-  const system = `You are Saturn Five's deal analyst assistant, answering questions about ONE specific CIM for the S5 Deals Team. S5 is a permanent-hold firm buying durable small businesses ($2-10M EBITDA, 4-6x, blue-collar, returns via distributions not exits). Ground every answer in the deal facts below; if something isn't covered, say it's not in the CIM and flag it as a diligence item. Be concise, specific, and honest about tradeoffs.
+  const system = `You are a deal analyst assistant, answering questions about ONE specific CIM for the deals team. The firm is a permanent-hold investor buying durable small businesses ($2-10M EBITDA, 4-6x, blue-collar, returns via distributions not exits). Ground every answer in the deal facts below; if something isn't covered, say it's not in the CIM and flag it as a diligence item. Be concise, specific, and honest about tradeoffs.
 
 === DEAL: ${deal.name} ===
 ${deal.digest||deal.summary}
@@ -1253,7 +1253,7 @@ RISKS: ${(deal.risks||[]).join("; ")}`;
     }finally{ setBusy(false); }
   };
 
-  const suggestions=["What's the biggest risk here?","How does this fit the S5 thesis?","How concentrated is the customer base?","What would you ask on the seller call?"];
+  const suggestions=["What's the biggest risk here?","How does this fit the investment thesis?","How concentrated is the customer base?","What would you ask on the seller call?"];
 
   return (
     <div className="chatwrap">
@@ -1261,18 +1261,18 @@ RISKS: ${(deal.risks||[]).join("; ")}`;
         {messages.length===0 && !busy &&
           <div>
             <div className="chatnote">
-              Ask anything about <strong style={{color:"var(--ink)"}}>{deal.name}</strong>. Answers are grounded in this CIM and the S5 thesis — the conversation stays on this deck.
+              Ask anything about <strong style={{color:"var(--ink)"}}>{deal.name}</strong>. Answers are grounded in this CIM and the investment thesis — the conversation stays on this deck.
             </div>
             <div className="suggest">{suggestions.map(s=>
               <button key={s} className="chip" onClick={()=>send(s)}>{s}</button>)}</div>
           </div>}
         {messages.map((m,i)=>(
           <div className={"msg "+(m.role==="user"?"user":"ai")} key={i}>
-            <div className="av">{m.role==="user"?"YOU":"S5"}</div>
+            <div className="av">{m.role==="user"?"YOU":"AI"}</div>
             <div className="bubble">{m.content}</div>
           </div>
         ))}
-        {busy && <div className="msg ai"><div className="av">S5</div>
+        {busy && <div className="msg ai"><div className="av">AI</div>
           <div className="bubble dots"><span></span><span></span><span></span></div></div>}
         {err && <div className="errbox">{err}</div>}
       </div>
@@ -1311,7 +1311,7 @@ function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,pdfCache}){
         if(!text || text.trim().length<200) throw new Error("PDF_EMPTY");
       }
       setProg(26);
-      setScan("Extracting facts against the S5 thesis…");
+      setScan("Extracting facts against the investment thesis…");
       const analysisInput = ANALYSIS_PROMPT+"\n\nCIM TEXT:\n"+text;
       const digestInput   = DIGEST_PROMPT+"\n\nCIM TEXT:\n"+text;
       const aRaw = await callClaude(analysisInput, {});
@@ -1399,7 +1399,7 @@ function UploadModal({onClose,addDeal,saveDeal,setActive,setTab,pdfCache}){
   );
 }
 function clamp(n){ n=+n; if(isNaN(n)) return 0; return Math.max(0,Math.min(100,Math.round(n))); }
-// Headline score, computed from the sub-ratings (weighted to S5 priorities) rather
+// Headline score, computed from the sub-ratings (weighted to the firm's priorities) rather
 // than trusted from the model — which otherwise flattens everything to ~75.
 function overallFromRatings(r){
   if(!r || typeof r!=="object") return null;

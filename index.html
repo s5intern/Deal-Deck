@@ -548,10 +548,25 @@ function friendlyError(e){
   if(m==="NETWORK") return "Couldn't reach the server. Check your connection and try again.";
   return "Something went wrong: "+m;
 }
-function parseJSON(text){
-  let t = text.replace(/```json/gi,"").replace(/```/g,"").trim();
-  const a=t.indexOf("{"), b=t.lastIndexOf("}");
-  if(a>=0 && b>a) t=t.slice(a,b+1);
+function parseJSON(input) {
+  // 1. If it's already an object, return it immediately
+  if (typeof input === "object" && input !== null) {
+    return input;
+  }
+
+  // 2. Safely convert to string and strip Markdown code fences
+  let t = String(input || "")
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .trim();
+
+  // 3. Extract the JSON block if wrapped in conversational text
+  const a = t.indexOf("{");
+  const b = t.lastIndexOf("}");
+  if (a >= 0 && b > a) {
+    t = t.slice(a, b + 1);
+  }
+
   return JSON.parse(t);
 }
 
